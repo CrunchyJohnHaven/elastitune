@@ -504,6 +504,7 @@ export default function ReportScreen() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <button
               onClick={handleDownloadReport}
+              aria-label="Download report JSON"
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -536,6 +537,7 @@ export default function ReportScreen() {
 
             <button
               onClick={handleShareReport}
+              aria-label="Copy shareable report HTML"
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -581,6 +583,7 @@ export default function ReportScreen() {
 
             <button
               onClick={handleCopyProfile}
+              aria-label="Copy optimized profile JSON"
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -615,6 +618,7 @@ export default function ReportScreen() {
 
             <button
               onClick={handleExportPdf}
+              aria-label="Export report to PDF"
               style={{
                 display: 'flex',
                 alignItems: 'center',
