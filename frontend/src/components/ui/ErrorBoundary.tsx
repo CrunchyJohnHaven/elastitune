@@ -2,8 +2,10 @@ import React from 'react';
 import { PANEL_BORDER } from '@/lib/theme';
 
 /* ─────────────────────────────────────────────────────
-   Catches render errors and shows a recovery message
-   instead of a white screen.
+   Catches render errors and shows a recovery message.
+   For stale chunk errors (after a new deployment has
+   rotated asset hashes), auto-reloads once so the user
+   gets the fresh bundle without needing to click.
    ───────────────────────────────────────────────────── */
 
 interface Props {
@@ -14,24 +16,68 @@ interface Props {
 interface State {
   hasError: boolean;
   error: Error | null;
+  autoReloading: boolean;
 }
+
+function isChunkError(err: Error | null): boolean {
+  if (!err) return false;
+  const msg = err.message ?? '';
+  return (
+    msg.includes('Failed to fetch dynamically imported module') ||
+    msg.includes('Importing a module script failed') ||
+    msg.includes('error loading dynamically imported module') ||
+    /Loading chunk \d+ failed/.test(msg)
+  );
+}
+
+const RELOAD_KEY = 'eb_chunk_reload';
 
 export default class ErrorBoundary extends React.Component<Props, State> {
   constructor(props: Props) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false, error: null, autoReloading: false };
   }
 
   static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error };
+    return { hasError: true, error, autoReloading: false };
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.error('ErrorBoundary caught:', error, info);
+
+    if (isChunkError(error)) {
+      const alreadyReloaded = sessionStorage.getItem(RELOAD_KEY) === '1';
+      if (!alreadyReloaded) {
+        sessionStorage.setItem(RELOAD_KEY, '1');
+        this.setState({ autoReloading: true });
+        window.location.reload();
+        return;
+      }
+    }
+    sessionStorage.removeItem(RELOAD_KEY);
   }
 
   render() {
     if (this.state.hasError) {
+      if (this.state.autoReloading) {
+        return (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minHeight: '100vh',
+              background: '#05070B',
+              color: '#9AA4B2',
+              fontFamily: 'Inter, sans-serif',
+              fontSize: 13,
+            }}
+          >
+            Refreshing to latest version…
+          </div>
+        );
+      }
+
       return (
         <div
           style={{
@@ -39,7 +85,7 @@ export default class ErrorBoundary extends React.Component<Props, State> {
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            minHeight: '100%',
+            minHeight: '100vh',
             padding: 40,
             background: '#05070B',
             color: '#EEF3FF',
@@ -67,7 +113,8 @@ export default class ErrorBoundary extends React.Component<Props, State> {
             </div>
             <button
               onClick={() => {
-                this.setState({ hasError: false, error: null });
+                sessionStorage.removeItem(RELOAD_KEY);
+                this.setState({ hasError: false, error: null, autoReloading: false });
                 window.location.reload();
               }}
               style={{
