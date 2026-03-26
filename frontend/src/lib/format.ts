@@ -15,6 +15,41 @@ export function formatDuration(seconds: number): string {
   return `${m}m ${s.toString().padStart(2, '0')}s`;
 }
 
+export function getDisplayElapsedSeconds({
+  metricsElapsedSeconds,
+  startedAt,
+  completedAt,
+  stage,
+  nowMs = Date.now(),
+}: {
+  metricsElapsedSeconds: number;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  stage?: string | null;
+  nowMs?: number;
+}): number {
+  const fallback = Math.max(0, metricsElapsedSeconds || 0);
+
+  const parse = (value?: string | null) => {
+    if (!value) return null;
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  const startedMs = parse(startedAt);
+  const completedMs = parse(completedAt);
+
+  if (startedMs != null && completedMs != null && (stage === 'completed' || stage === 'error')) {
+    return Math.max(fallback, (completedMs - startedMs) / 1000);
+  }
+
+  if (startedMs != null && stage && ['starting', 'running', 'stopping'].includes(stage)) {
+    return Math.max(fallback, (nowMs - startedMs) / 1000);
+  }
+
+  return fallback;
+}
+
 export function formatBytes(bytes: number): string {
   if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(2)} GB`;
   if (bytes >= 1e6) return `${(bytes / 1e6).toFixed(1)} MB`;

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAppStore } from '@/store/useAppStore';
-import { formatScore, formatPercent, formatDuration, formatDollars, truncate } from '@/lib/format';
+import { formatScore, formatPercent, formatDuration, formatDollars, truncate, getDisplayElapsedSeconds } from '@/lib/format';
 import { PANEL_BORDER, ACCENT_BLUE, TEXT_SECONDARY, TEXT_DIM } from '@/lib/theme';
 
 function formatQueriesTested(evalCaseCount: number, experimentsRun: number, baselineScore: number) {
@@ -188,6 +188,9 @@ export default function TopTelemetryBar() {
   const metrics = useAppStore(state => state.runSnapshot?.metrics);
   const summary = useAppStore(state => state.runSnapshot?.summary);
   const mode = useAppStore(state => state.runSnapshot?.mode ?? 'demo');
+  const stage = useAppStore(state => state.runSnapshot?.stage ?? 'idle');
+  const startedAt = useAppStore(state => state.runSnapshot?.startedAt);
+  const completedAt = useAppStore(state => state.runSnapshot?.completedAt);
   const socketStatus = useAppStore(state => state.socketStatus);
   const [, forceUpdate] = useState(0);
 
@@ -208,7 +211,16 @@ export default function TopTelemetryBar() {
     metrics?.projectedMonthlySavingsUsd != null
       ? formatDollars(metrics.projectedMonthlySavingsUsd)
       : '—';
-  const elapsed = metrics ? formatDuration(metrics.elapsedSeconds) : '—';
+  const elapsed = metrics
+    ? formatDuration(
+        getDisplayElapsedSeconds({
+          metricsElapsedSeconds: metrics.elapsedSeconds,
+          startedAt,
+          completedAt,
+          stage,
+        })
+      )
+    : '—';
   const queriesTested = summary && metrics
     ? formatQueriesTested(summary.baselineEvalCount, metrics.experimentsRun, metrics.baselineScore)
     : '—';
