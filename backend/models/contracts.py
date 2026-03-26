@@ -113,6 +113,7 @@ class SearchProfile(BaseModel):
     rrfRankConstant: int = 60
     knnK: int = 20
     numCandidates: int = 100
+    modelId: Optional[str] = None  # Elasticsearch model_id for query_vector_builder (e.g. ".elser_model_2", ".multilingual-e5-small")
 
 
 class SearchProfileChange(BaseModel):
@@ -263,6 +264,29 @@ class StopRunResponse(BaseModel):
     runId: str
     productMode: ProductMode = "search"
     stage: RunStage
+
+
+class ModelCompareRequest(BaseModel):
+    connectionId: str
+    modelIds: List[str]  # e.g. [".elser_model_2", ".multilingual-e5-small"]
+    maxExperimentsPerModel: int = 10
+
+
+class ModelComparisonEntry(BaseModel):
+    modelId: str
+    baselineScore: float
+    bestScore: float
+    improvementPct: float
+    experimentsRun: int
+    improvementsKept: int
+    bestProfile: SearchProfile
+    topChanges: List[str] = []
+
+
+class ModelComparisonResult(BaseModel):
+    entries: List[ModelComparisonEntry] = []
+    recommendedModel: Optional[str] = None
+    comparisonNote: str = ""
 
 
 # WebSocket event union type aliases (used as dicts in practice)

@@ -379,7 +379,7 @@ class ESService:
                     "field": p.vectorField,
                     "query_vector_builder": {
                         "text_embedding": {
-                            "model_id": ".elser_model_2",
+                            "model_id": p.modelId if p.modelId else ".elser_model_2",
                             "model_text": query_text,
                         }
                     },

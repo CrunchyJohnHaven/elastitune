@@ -10,6 +10,9 @@ from fastapi.responses import JSONResponse
 
 from ..engine.persona_generator import build_personas
 from ..models.contracts import (
+    ModelCompareRequest,
+    ModelComparisonEntry,
+    ModelComparisonResult,
     PersonaViewModel,
     RunSnapshot,
     StartRunRequest,
@@ -268,4 +271,99 @@ async def preview_query(run_id: str, queryId: str, request: Request) -> JSONResp
             "baselineQueryDsl": baseline_query,
             "optimizedQueryDsl": optimized_query,
         }
+    )
+
+
+@router.post("/model-compare", response_model=ModelComparisonResult)
+async def start_model_comparison(
+    req: ModelCompareRequest, request: Request
+) -> ModelComparisonResult:
+    """Evaluate the baseline profile with each provided model and return a ranked comparison."""
+    run_manager: RunManager = _get_run_manager(request)
+
+    conn_ctx = await run_manager.get_connection(req.connectionId)
+    if not conn_ctx:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Connection '{req.connectionId}' not found. Call /connect first.",
+        )
+
+    from ..services.es_service import ESService
+    from ..services.task_runner import SearchTaskRunner
+
+    task_runner = SearchTaskRunner(run_manager)
+    entries: list[ModelComparisonEntry] = []
+
+    for model_id in req.modelIds:
+        # Clone baseline profile and set modelId
+        profile = conn_ctx.baseline_profile.model_copy(deep=True)
+        profile.modelId = model_id
+
+        # Build a lightweight RunContext-like object using the connection context
+        # We use a minimal RunContext so evaluate_profile can run
+        from ..models.runtime import RunContext
+
+        tmp_ctx = RunContext(
+            run_id=f"model-compare-{model_id}",
+            connection=conn_ctx,
+            personas=[],
+            max_experiments=0,
+            duration_minutes=0,
+            auto_stop_on_plateau=False,
+        )
+
+        score = 0.0
+        es_svc = None
+        try:
+            if conn_ctx.es_url:
+                es_svc = ESService(
+                    es_url=conn_ctx.es_url, api_key=conn_ctx.api_key or None
+                )
+            score, _failures, _per_query = await task_runner.evaluate_profile(
+                tmp_ctx, profile, es_svc=es_svc
+            )
+        except Exception as exc:
+            logger.warning("Model comparison evaluation failed for model %s: %s", model_id, exc)
+        finally:
+            if es_svc is not None:
+                await es_svc.close()
+
+        entries.append(
+            ModelComparisonEntry(
+                modelId=model_id,
+                baselineScore=score,
+                bestScore=score,
+                improvementPct=0.0,
+                experimentsRun=0,
+                improvementsKept=0,
+                bestProfile=profile,
+                topChanges=[],
+            )
+        )
+
+    # Sort by bestScore descending
+    entries.sort(key=lambda e: e.bestScore, reverse=True)
+
+    recommended_model: Optional[str] = entries[0].modelId if entries else None
+
+    if len(entries) == 0:
+        comparison_note = "No models were evaluated."
+    elif len(entries) == 1:
+        comparison_note = (
+            f"Only one model evaluated: {entries[0].modelId} scored {entries[0].bestScore:.4f}."
+        )
+    else:
+        top = entries[0]
+        runner_up = entries[1]
+        gap = top.bestScore - runner_up.bestScore
+        comparison_note = (
+            f"{top.modelId} achieved the highest baseline nDCG@10 of {top.bestScore:.4f}, "
+            f"outperforming {runner_up.modelId} ({runner_up.bestScore:.4f}) by {gap:.4f}. "
+            f"Run a full optimization using the recommended model for best results."
+        )
+
+    return ModelComparisonResult(
+        entries=entries,
+        recommendedModel=recommended_model,
+        comparisonNote=comparison_note,
     )

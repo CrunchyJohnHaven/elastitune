@@ -1,5 +1,5 @@
 import type {
-  BenchmarkHealthPreset, ConnectRequest, ConnectResponse, QueryPreviewPayload, RunSnapshot, ReportPayload, SearchRunListItem
+  BenchmarkHealthPreset, ConnectRequest, ConnectResponse, ModelComparisonResult, QueryPreviewPayload, RunSnapshot, ReportPayload, SearchRunListItem
 } from '@/types/contracts';
 import type {
   CommitteeConnectionResponse,
@@ -175,4 +175,14 @@ export const api = {
 
   getCommitteeExport: (runId: string) =>
     request<CommitteeExportPayload>(`/committee/runs/${runId}/export`),
+
+  async compareModels(connectionId: string, modelIds: string[], maxExperimentsPerModel = 10): Promise<ModelComparisonResult> {
+    const res = await fetch(`${BASE}/model-compare`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ connectionId, modelIds, maxExperimentsPerModel }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
 };

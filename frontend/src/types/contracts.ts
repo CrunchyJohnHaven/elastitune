@@ -97,6 +97,24 @@ export interface SearchProfile {
   rrfRankConstant: number;
   knnK: number;
   numCandidates: number;
+  modelId?: string | null;  // ES model_id for query_vector_builder
+}
+
+export interface ModelComparisonEntry {
+  modelId: string;
+  baselineScore: number;
+  bestScore: number;
+  improvementPct: number;
+  experimentsRun: number;
+  improvementsKept: number;
+  bestProfile: SearchProfile;
+  topChanges: string[];
+}
+
+export interface ModelComparisonResult {
+  entries: ModelComparisonEntry[];
+  recommendedModel: string | null;
+  comparisonNote: string;
 }
 
 export interface SearchProfileChange {
@@ -277,6 +295,7 @@ export interface ReportPayload {
     improvementsKept: number;
     durationSeconds: number;
     projectedMonthlySavingsUsd?: number | null;
+    modelId?: string | null;
     // Continuation tracking
     isContinuation?: boolean;
     originalBaselineScore?: number | null;

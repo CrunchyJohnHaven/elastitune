@@ -11,7 +11,7 @@ from backend.models.contracts import (
     SearchProfile,
     SearchProfileChange,
 )
-from backend.models.report import ReportPayload, ReportSummary
+from backend.models.report import ReportPayload
 from backend.services.demo_service import DemoService
 from backend.services.report_service import ReportService
 
