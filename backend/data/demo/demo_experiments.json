@@ -1,0 +1,686 @@
+[
+  {
+    "experimentId": 1,
+    "timestamp": "2024-01-15T09:41:22Z",
+    "hypothesis": "Stronger title weighting will help exact incident lookups",
+    "change": {
+      "path": "lexicalFields[0].boost",
+      "before": 3.0,
+      "after": 4.0,
+      "label": "title boost 3.0 → 4.0"
+    },
+    "baselineScore": 0.412,
+    "candidateScore": 0.428,
+    "deltaAbsolute": 0.016,
+    "deltaPercent": 3.88,
+    "decision": "kept",
+    "durationMs": 2341,
+    "queryFailuresBefore": ["lateral movement detection query"],
+    "queryFailuresAfter": []
+  },
+  {
+    "experimentId": 2,
+    "timestamp": "2024-01-15T09:44:07Z",
+    "hypothesis": "Switching to cross_fields matching should improve recall for multi-field security queries",
+    "change": {
+      "path": "multiMatchType",
+      "before": "best_fields",
+      "after": "cross_fields",
+      "label": "multiMatchType best_fields → cross_fields"
+    },
+    "baselineScore": 0.428,
+    "candidateScore": 0.421,
+    "deltaAbsolute": -0.007,
+    "deltaPercent": -1.64,
+    "decision": "reverted",
+    "durationMs": 2187,
+    "queryFailuresBefore": [],
+    "queryFailuresAfter": ["c2 beacon dns exfil"]
+  },
+  {
+    "experimentId": 3,
+    "timestamp": "2024-01-15T09:47:31Z",
+    "hypothesis": "Adjusting minimum_should_match to 2<75% should reduce noise while keeping precision",
+    "change": {
+      "path": "minimumShouldMatch",
+      "before": "75%",
+      "after": "2<75%",
+      "label": "minimumShouldMatch 75% → 2<75%"
+    },
+    "baselineScore": 0.428,
+    "candidateScore": 0.441,
+    "deltaAbsolute": 0.013,
+    "deltaPercent": 3.04,
+    "decision": "kept",
+    "durationMs": 2456,
+    "queryFailuresBefore": ["privileged account creation"],
+    "queryFailuresAfter": []
+  },
+  {
+    "experimentId": 4,
+    "timestamp": "2024-01-15T09:51:14Z",
+    "hypothesis": "Adding phrase boost of 1.0 should reward exact phrase matches in security alerts",
+    "change": {
+      "path": "phraseBoost",
+      "before": 0.0,
+      "after": 1.0,
+      "label": "phraseBoost 0.0 → 1.0"
+    },
+    "baselineScore": 0.441,
+    "candidateScore": 0.452,
+    "deltaAbsolute": 0.011,
+    "deltaPercent": 2.49,
+    "decision": "kept",
+    "durationMs": 2612,
+    "queryFailuresBefore": [],
+    "queryFailuresAfter": []
+  },
+  {
+    "experimentId": 5,
+    "timestamp": "2024-01-15T09:54:48Z",
+    "hypothesis": "Stronger message field weighting should surface alert body text for contextual queries",
+    "change": {
+      "path": "lexicalFields[2].boost",
+      "before": 1.5,
+      "after": 2.0,
+      "label": "message boost 1.5 → 2.0"
+    },
+    "baselineScore": 0.452,
+    "candidateScore": 0.449,
+    "deltaAbsolute": -0.003,
+    "deltaPercent": -0.66,
+    "decision": "reverted",
+    "durationMs": 2298,
+    "queryFailuresBefore": [],
+    "queryFailuresAfter": []
+  },
+  {
+    "experimentId": 6,
+    "timestamp": "2024-01-15T09:58:02Z",
+    "hypothesis": "Enabling fuzziness AUTO should improve recall for misspelled queries",
+    "change": {
+      "path": "fuzziness",
+      "before": "0",
+      "after": "AUTO",
+      "label": "fuzziness 0 → AUTO"
+    },
+    "baselineScore": 0.452,
+    "candidateScore": 0.447,
+    "deltaAbsolute": -0.005,
+    "deltaPercent": -1.11,
+    "decision": "reverted",
+    "durationMs": 2889,
+    "queryFailuresBefore": [],
+    "queryFailuresAfter": ["failed auth admin account"]
+  },
+  {
+    "experimentId": 7,
+    "timestamp": "2024-01-15T10:01:37Z",
+    "hypothesis": "Setting tie_breaker to 0.3 should improve ranking across multiple security fields",
+    "change": {
+      "path": "tieBreaker",
+      "before": 0.0,
+      "after": 0.3,
+      "label": "tieBreaker 0.0 → 0.3"
+    },
+    "baselineScore": 0.452,
+    "candidateScore": 0.461,
+    "deltaAbsolute": 0.009,
+    "deltaPercent": 1.99,
+    "decision": "kept",
+    "durationMs": 2134,
+    "queryFailuresBefore": [],
+    "queryFailuresAfter": []
+  },
+  {
+    "experimentId": 8,
+    "timestamp": "2024-01-15T10:05:22Z",
+    "hypothesis": "Stronger rule.name field weighting should improve detection rule lookups",
+    "change": {
+      "path": "lexicalFields[3].boost",
+      "before": 1.5,
+      "after": 3.0,
+      "label": "rule.name boost 1.5 → 3.0"
+    },
+    "baselineScore": 0.461,
+    "candidateScore": 0.471,
+    "deltaAbsolute": 0.010,
+    "deltaPercent": 2.17,
+    "decision": "kept",
+    "durationMs": 2567,
+    "queryFailuresBefore": ["sigma rule edr deployment"],
+    "queryFailuresAfter": []
+  },
+  {
+    "experimentId": 9,
+    "timestamp": "2024-01-15T10:09:11Z",
+    "hypothesis": "Rebalancing lexical/vector weights to 0.75/0.25 should improve hybrid retrieval",
+    "change": {
+      "path": "lexicalWeight",
+      "before": 0.65,
+      "after": 0.75,
+      "label": "lexical/vector weight 0.65/0.35 → 0.75/0.25"
+    },
+    "baselineScore": 0.471,
+    "candidateScore": 0.478,
+    "deltaAbsolute": 0.007,
+    "deltaPercent": 1.49,
+    "decision": "kept",
+    "durationMs": 3102,
+    "queryFailuresBefore": [],
+    "queryFailuresAfter": []
+  },
+  {
+    "experimentId": 10,
+    "timestamp": "2024-01-15T10:13:45Z",
+    "hypothesis": "Switching to most_fields matching should improve coverage for security terminology",
+    "change": {
+      "path": "multiMatchType",
+      "before": "best_fields",
+      "after": "most_fields",
+      "label": "multiMatchType best_fields → most_fields"
+    },
+    "baselineScore": 0.478,
+    "candidateScore": 0.474,
+    "deltaAbsolute": -0.004,
+    "deltaPercent": -0.84,
+    "decision": "reverted",
+    "durationMs": 2244,
+    "queryFailuresBefore": [],
+    "queryFailuresAfter": []
+  },
+  {
+    "experimentId": 11,
+    "timestamp": "2024-01-15T10:17:29Z",
+    "hypothesis": "Increasing phrase boost to 1.5 should further reward exact phrase matches",
+    "change": {
+      "path": "phraseBoost",
+      "before": 1.0,
+      "after": 1.5,
+      "label": "phraseBoost 1.0 → 1.5"
+    },
+    "baselineScore": 0.478,
+    "candidateScore": 0.484,
+    "deltaAbsolute": 0.006,
+    "deltaPercent": 1.26,
+    "decision": "kept",
+    "durationMs": 2791,
+    "queryFailuresBefore": [],
+    "queryFailuresAfter": []
+  },
+  {
+    "experimentId": 12,
+    "timestamp": "2024-01-15T10:21:08Z",
+    "hypothesis": "Switching to RRF fusion should better balance lexical and vector scores for security data",
+    "change": {
+      "path": "fusionMethod",
+      "before": "weighted_sum",
+      "after": "rrf",
+      "label": "fusionMethod weighted_sum → rrf"
+    },
+    "baselineScore": 0.484,
+    "candidateScore": 0.481,
+    "deltaAbsolute": -0.003,
+    "deltaPercent": -0.62,
+    "decision": "reverted",
+    "durationMs": 2967,
+    "queryFailuresBefore": [],
+    "queryFailuresAfter": []
+  },
+  {
+    "experimentId": 13,
+    "timestamp": "2024-01-15T10:24:53Z",
+    "hypothesis": "Expanding numCandidates to 150 should improve vector retrieval quality",
+    "change": {
+      "path": "numCandidates",
+      "before": 100,
+      "after": 150,
+      "label": "numCandidates 100 → 150"
+    },
+    "baselineScore": 0.484,
+    "candidateScore": 0.491,
+    "deltaAbsolute": 0.007,
+    "deltaPercent": 1.45,
+    "decision": "kept",
+    "durationMs": 3341,
+    "queryFailuresBefore": [],
+    "queryFailuresAfter": []
+  },
+  {
+    "experimentId": 14,
+    "timestamp": "2024-01-15T10:28:37Z",
+    "hypothesis": "Adjusting minimum_should_match to 3<80% should tighten relevance for multi-term queries",
+    "change": {
+      "path": "minimumShouldMatch",
+      "before": "2<75%",
+      "after": "3<80%",
+      "label": "minimumShouldMatch 2<75% → 3<80%"
+    },
+    "baselineScore": 0.491,
+    "candidateScore": 0.488,
+    "deltaAbsolute": -0.003,
+    "deltaPercent": -0.61,
+    "decision": "reverted",
+    "durationMs": 2189,
+    "queryFailuresBefore": [],
+    "queryFailuresAfter": []
+  },
+  {
+    "experimentId": 15,
+    "timestamp": "2024-01-15T10:32:14Z",
+    "hypothesis": "Stronger title boost to 5.0 will further prioritize direct alert name matches",
+    "change": {
+      "path": "lexicalFields[0].boost",
+      "before": 4.0,
+      "after": 5.0,
+      "label": "title boost 4.0 → 5.0"
+    },
+    "baselineScore": 0.491,
+    "candidateScore": 0.498,
+    "deltaAbsolute": 0.007,
+    "deltaPercent": 1.43,
+    "decision": "kept",
+    "durationMs": 2423,
+    "queryFailuresBefore": [],
+    "queryFailuresAfter": []
+  },
+  {
+    "experimentId": 16,
+    "timestamp": "2024-01-15T10:36:02Z",
+    "hypothesis": "Adjusting RRF rank constant to 40 should improve rank fusion stability",
+    "change": {
+      "path": "rrfRankConstant",
+      "before": 60,
+      "after": 40,
+      "label": "rrfRankConstant 60 → 40"
+    },
+    "baselineScore": 0.498,
+    "candidateScore": 0.495,
+    "deltaAbsolute": -0.003,
+    "deltaPercent": -0.60,
+    "decision": "reverted",
+    "durationMs": 2756,
+    "queryFailuresBefore": [],
+    "queryFailuresAfter": []
+  },
+  {
+    "experimentId": 17,
+    "timestamp": "2024-01-15T10:39:47Z",
+    "hypothesis": "Increasing kNN k to 30 should improve vector recall for semantic security queries",
+    "change": {
+      "path": "knnK",
+      "before": 20,
+      "after": 30,
+      "label": "knnK 20 → 30"
+    },
+    "baselineScore": 0.498,
+    "candidateScore": 0.505,
+    "deltaAbsolute": 0.007,
+    "deltaPercent": 1.41,
+    "decision": "kept",
+    "durationMs": 3198,
+    "queryFailuresBefore": [],
+    "queryFailuresAfter": []
+  },
+  {
+    "experimentId": 18,
+    "timestamp": "2024-01-15T10:43:31Z",
+    "hypothesis": "Reducing title boost to 4.0 may reduce over-ranking of exact name matches",
+    "change": {
+      "path": "lexicalFields[0].boost",
+      "before": 5.0,
+      "after": 4.0,
+      "label": "title boost 5.0 → 4.0"
+    },
+    "baselineScore": 0.505,
+    "candidateScore": 0.501,
+    "deltaAbsolute": -0.004,
+    "deltaPercent": -0.79,
+    "decision": "reverted",
+    "durationMs": 2314,
+    "queryFailuresBefore": [],
+    "queryFailuresAfter": []
+  },
+  {
+    "experimentId": 19,
+    "timestamp": "2024-01-15T10:47:16Z",
+    "hypothesis": "Rebalancing lexical/vector weights to 0.85/0.15 may improve lexical precision",
+    "change": {
+      "path": "lexicalWeight",
+      "before": 0.75,
+      "after": 0.85,
+      "label": "lexical/vector weight 0.75/0.25 → 0.85/0.15"
+    },
+    "baselineScore": 0.505,
+    "candidateScore": 0.502,
+    "deltaAbsolute": -0.003,
+    "deltaPercent": -0.59,
+    "decision": "reverted",
+    "durationMs": 3012,
+    "queryFailuresBefore": [],
+    "queryFailuresAfter": []
+  },
+  {
+    "experimentId": 20,
+    "timestamp": "2024-01-15T10:51:04Z",
+    "hypothesis": "Stronger description field weighting should improve contextual alert searches",
+    "change": {
+      "path": "lexicalFields[2].boost",
+      "before": 1.5,
+      "after": 2.0,
+      "label": "description boost 1.5 → 2.0"
+    },
+    "baselineScore": 0.505,
+    "candidateScore": 0.512,
+    "deltaAbsolute": 0.007,
+    "deltaPercent": 1.39,
+    "decision": "kept",
+    "durationMs": 2678,
+    "queryFailuresBefore": [],
+    "queryFailuresAfter": []
+  },
+  {
+    "experimentId": 21,
+    "timestamp": "2024-01-15T10:54:49Z",
+    "hypothesis": "Expanding numCandidates to 250 should further improve vector retrieval quality",
+    "change": {
+      "path": "numCandidates",
+      "before": 150,
+      "after": 250,
+      "label": "numCandidates 150 → 250"
+    },
+    "baselineScore": 0.512,
+    "candidateScore": 0.516,
+    "deltaAbsolute": 0.004,
+    "deltaPercent": 0.78,
+    "decision": "kept",
+    "durationMs": 3567,
+    "queryFailuresBefore": [],
+    "queryFailuresAfter": []
+  },
+  {
+    "experimentId": 22,
+    "timestamp": "2024-01-15T10:58:33Z",
+    "hypothesis": "Adjusting minimum_should_match to 100% should maximize precision",
+    "change": {
+      "path": "minimumShouldMatch",
+      "before": "2<75%",
+      "after": "100%",
+      "label": "minimumShouldMatch 2<75% → 100%"
+    },
+    "baselineScore": 0.516,
+    "candidateScore": 0.503,
+    "deltaAbsolute": -0.013,
+    "deltaPercent": -2.52,
+    "decision": "reverted",
+    "durationMs": 2201,
+    "queryFailuresBefore": [],
+    "queryFailuresAfter": ["kerberoasting golden ticket", "s3 bucket public exposure"]
+  },
+  {
+    "experimentId": 23,
+    "timestamp": "2024-01-15T11:02:18Z",
+    "hypothesis": "Setting tie_breaker to 0.2 may improve multi-field ranking balance",
+    "change": {
+      "path": "tieBreaker",
+      "before": 0.3,
+      "after": 0.2,
+      "label": "tieBreaker 0.3 → 0.2"
+    },
+    "baselineScore": 0.516,
+    "candidateScore": 0.514,
+    "deltaAbsolute": -0.002,
+    "deltaPercent": -0.39,
+    "decision": "reverted",
+    "durationMs": 2145,
+    "queryFailuresBefore": [],
+    "queryFailuresAfter": []
+  },
+  {
+    "experimentId": 24,
+    "timestamp": "2024-01-15T11:06:04Z",
+    "hypothesis": "Phrase boost of 2.0 should strongly reward exact phrase matches in alert titles",
+    "change": {
+      "path": "phraseBoost",
+      "before": 1.5,
+      "after": 2.0,
+      "label": "phraseBoost 1.5 → 2.0"
+    },
+    "baselineScore": 0.516,
+    "candidateScore": 0.524,
+    "deltaAbsolute": 0.008,
+    "deltaPercent": 1.55,
+    "decision": "kept",
+    "durationMs": 2834,
+    "queryFailuresBefore": [],
+    "queryFailuresAfter": []
+  },
+  {
+    "experimentId": 25,
+    "timestamp": "2024-01-15T11:09:52Z",
+    "hypothesis": "Switching to cross_fields should improve recall for multi-field alert searches",
+    "change": {
+      "path": "multiMatchType",
+      "before": "best_fields",
+      "after": "cross_fields",
+      "label": "multiMatchType best_fields → cross_fields"
+    },
+    "baselineScore": 0.524,
+    "candidateScore": 0.519,
+    "deltaAbsolute": -0.005,
+    "deltaPercent": -0.95,
+    "decision": "reverted",
+    "durationMs": 2389,
+    "queryFailuresBefore": [],
+    "queryFailuresAfter": []
+  },
+  {
+    "experimentId": 26,
+    "timestamp": "2024-01-15T11:13:37Z",
+    "hypothesis": "Rebalancing to 0.55/0.45 lexical/vector mix should amplify semantic similarity",
+    "change": {
+      "path": "lexicalWeight",
+      "before": 0.75,
+      "after": 0.55,
+      "label": "lexical/vector weight 0.75/0.25 → 0.55/0.45"
+    },
+    "baselineScore": 0.524,
+    "candidateScore": 0.520,
+    "deltaAbsolute": -0.004,
+    "deltaPercent": -0.76,
+    "decision": "reverted",
+    "durationMs": 3123,
+    "queryFailuresBefore": [],
+    "queryFailuresAfter": []
+  },
+  {
+    "experimentId": 27,
+    "timestamp": "2024-01-15T11:17:21Z",
+    "hypothesis": "Stronger host.name field weighting should improve host-based threat lookups",
+    "change": {
+      "path": "lexicalFields[4].boost",
+      "before": 1.0,
+      "after": 2.0,
+      "label": "host.name boost 1.0 → 2.0"
+    },
+    "baselineScore": 0.524,
+    "candidateScore": 0.532,
+    "deltaAbsolute": 0.008,
+    "deltaPercent": 1.53,
+    "decision": "kept",
+    "durationMs": 2512,
+    "queryFailuresBefore": ["cpu spike k8s node"],
+    "queryFailuresAfter": []
+  },
+  {
+    "experimentId": 28,
+    "timestamp": "2024-01-15T11:21:08Z",
+    "hypothesis": "Adjusting RRF rank constant to 20 may improve score fusion for security queries",
+    "change": {
+      "path": "rrfRankConstant",
+      "before": 60,
+      "after": 20,
+      "label": "rrfRankConstant 60 → 20"
+    },
+    "baselineScore": 0.532,
+    "candidateScore": 0.528,
+    "deltaAbsolute": -0.004,
+    "deltaPercent": -0.75,
+    "decision": "reverted",
+    "durationMs": 2876,
+    "queryFailuresBefore": [],
+    "queryFailuresAfter": []
+  },
+  {
+    "experimentId": 29,
+    "timestamp": "2024-01-15T11:24:54Z",
+    "hypothesis": "Increasing kNN k to 50 should maximize vector recall for semantic searches",
+    "change": {
+      "path": "knnK",
+      "before": 30,
+      "after": 50,
+      "label": "knnK 30 → 50"
+    },
+    "baselineScore": 0.532,
+    "candidateScore": 0.539,
+    "deltaAbsolute": 0.007,
+    "deltaPercent": 1.32,
+    "decision": "kept",
+    "durationMs": 3689,
+    "queryFailuresBefore": [],
+    "queryFailuresAfter": []
+  },
+  {
+    "experimentId": 30,
+    "timestamp": "2024-01-15T11:28:41Z",
+    "hypothesis": "Adjusting minimum_should_match to 50% may improve recall at cost of some precision",
+    "change": {
+      "path": "minimumShouldMatch",
+      "before": "2<75%",
+      "after": "50%",
+      "label": "minimumShouldMatch 2<75% → 50%"
+    },
+    "baselineScore": 0.539,
+    "candidateScore": 0.533,
+    "deltaAbsolute": -0.006,
+    "deltaPercent": -1.11,
+    "decision": "reverted",
+    "durationMs": 2234,
+    "queryFailuresBefore": [],
+    "queryFailuresAfter": []
+  },
+  {
+    "experimentId": 31,
+    "timestamp": "2024-01-15T11:32:27Z",
+    "hypothesis": "Expanding numCandidates to 400 should maximize vector retrieval coverage",
+    "change": {
+      "path": "numCandidates",
+      "before": 250,
+      "after": 400,
+      "label": "numCandidates 250 → 400"
+    },
+    "baselineScore": 0.539,
+    "candidateScore": 0.544,
+    "deltaAbsolute": 0.005,
+    "deltaPercent": 0.93,
+    "decision": "kept",
+    "durationMs": 4102,
+    "queryFailuresBefore": [],
+    "queryFailuresAfter": []
+  },
+  {
+    "experimentId": 32,
+    "timestamp": "2024-01-15T11:36:14Z",
+    "hypothesis": "Setting tie_breaker to 0.5 should aggressively reward multi-field matches",
+    "change": {
+      "path": "tieBreaker",
+      "before": 0.3,
+      "after": 0.5,
+      "label": "tieBreaker 0.3 → 0.5"
+    },
+    "baselineScore": 0.544,
+    "candidateScore": 0.541,
+    "deltaAbsolute": -0.003,
+    "deltaPercent": -0.55,
+    "decision": "reverted",
+    "durationMs": 2178,
+    "queryFailuresBefore": [],
+    "queryFailuresAfter": []
+  },
+  {
+    "experimentId": 33,
+    "timestamp": "2024-01-15T11:40:02Z",
+    "hypothesis": "Stronger rule.name boost to 4.0 should further improve detection rule lookups",
+    "change": {
+      "path": "lexicalFields[3].boost",
+      "before": 3.0,
+      "after": 4.0,
+      "label": "rule.name boost 3.0 → 4.0"
+    },
+    "baselineScore": 0.544,
+    "candidateScore": 0.551,
+    "deltaAbsolute": 0.007,
+    "deltaPercent": 1.29,
+    "decision": "kept",
+    "durationMs": 2601,
+    "queryFailuresBefore": [],
+    "queryFailuresAfter": []
+  },
+  {
+    "experimentId": 34,
+    "timestamp": "2024-01-15T11:43:49Z",
+    "hypothesis": "Switching to phrase matching type may reward exact alert name searches",
+    "change": {
+      "path": "multiMatchType",
+      "before": "best_fields",
+      "after": "phrase",
+      "label": "multiMatchType best_fields → phrase"
+    },
+    "baselineScore": 0.551,
+    "candidateScore": 0.546,
+    "deltaAbsolute": -0.005,
+    "deltaPercent": -0.91,
+    "decision": "reverted",
+    "durationMs": 2456,
+    "queryFailuresBefore": [],
+    "queryFailuresAfter": ["c2 beacon dns exfil", "mfa bypass attempt"]
+  },
+  {
+    "experimentId": 35,
+    "timestamp": "2024-01-15T11:47:36Z",
+    "hypothesis": "Rebalancing lexical/vector to 0.65/0.35 should restore optimal hybrid balance",
+    "change": {
+      "path": "lexicalWeight",
+      "before": 0.75,
+      "after": 0.65,
+      "label": "lexical/vector weight 0.75/0.25 → 0.65/0.35"
+    },
+    "baselineScore": 0.551,
+    "candidateScore": 0.558,
+    "deltaAbsolute": 0.007,
+    "deltaPercent": 1.27,
+    "decision": "kept",
+    "durationMs": 3234,
+    "queryFailuresBefore": [],
+    "queryFailuresAfter": []
+  },
+  {
+    "experimentId": 36,
+    "timestamp": "2024-01-15T11:51:23Z",
+    "hypothesis": "Adjusting RRF rank constant to 10 should sharpen top-rank score separation",
+    "change": {
+      "path": "rrfRankConstant",
+      "before": 60,
+      "after": 10,
+      "label": "rrfRankConstant 60 → 10"
+    },
+    "baselineScore": 0.558,
+    "candidateScore": 0.554,
+    "deltaAbsolute": -0.004,
+    "deltaPercent": -0.72,
+    "decision": "reverted",
+    "durationMs": 2789,
+    "queryFailuresBefore": [],
+    "queryFailuresAfter": []
+  }
+]

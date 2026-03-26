@@ -1,0 +1,168 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #05070B;
+  --bg-elevated: #0B0F15;
+  --panel: rgba(10, 14, 20, 0.78);
+  --panel-solid: #0D1219;
+  --panel-border: rgba(255,255,255,0.08);
+  --text-primary: #EEF3FF;
+  --text-secondary: #9AA4B2;
+  --text-dim: #6B7480;
+  --accent-blue: #4DA3FF;
+  --accent-cyan: #7CE7FF;
+  --success: #4ADE80;
+  --warning: #FBBF24;
+  --danger: #FB7185;
+  --glow-white: rgba(255,255,255,0.92);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text-primary);
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
+}
+
+.font-mono {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.12);
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.2);
+}
+
+/* Panel base */
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* Glow text */
+.glow-blue {
+  text-shadow: 0 0 12px rgba(77, 163, 255, 0.6);
+}
+.glow-cyan {
+  text-shadow: 0 0 12px rgba(124, 231, 255, 0.6);
+}
+.glow-green {
+  text-shadow: 0 0 12px rgba(74, 222, 128, 0.5);
+}
+
+/* Telemetry label */
+.telemetry-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.telemetry-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* Experiment row */
+.experiment-kept {
+  background: rgba(74, 222, 128, 0.04);
+  border-left: 2px solid rgba(74, 222, 128, 0.5);
+}
+.experiment-reverted {
+  background: rgba(251, 113, 133, 0.04);
+  border-left: 2px solid rgba(251, 113, 133, 0.3);
+}
+
+/* Panel header */
+.panel-header {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+/* Subtle grid overlay for dark panels */
+.scanline-bg {
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(255,255,255,0.008) 2px,
+    rgba(255,255,255,0.008) 4px
+  );
+}
+
+/* Print styles for report */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+    overflow: auto !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-page {
+    break-after: page;
+  }
+}
+
+/* Animations */
+@keyframes pulse-ring {
+  0% { transform: scale(1); opacity: 0.8; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+
+@keyframes count-up {
+  from { opacity: 0.3; }
+  to { opacity: 1; }
+}
+
+@keyframes wave-expand {
+  from { transform: scale(0); opacity: 0.6; }
+  to { transform: scale(3); opacity: 0; }
+}
+
+@keyframes slide-in-left {
+  from { transform: translateX(-8px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

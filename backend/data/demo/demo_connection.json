@@ -1,0 +1,32 @@
+{
+  "clusterName": "secops-demo",
+  "clusterVersion": "8.11.3",
+  "indexName": "alerts-security-demo",
+  "docCount": 2435510,
+  "detectedDomain": "security",
+  "primaryTextFields": ["title", "message", "description", "rule.name", "host.name"],
+  "vectorField": "embedding",
+  "vectorDims": 768,
+  "sampleDocs": [
+    {
+      "id": "alert_001",
+      "title": "Suspicious PowerShell execution detected",
+      "excerpt": "PowerShell with encoded command executed from non-interactive session on WORKSTATION-042",
+      "fieldPreview": {"host.name": "WORKSTATION-042", "rule.name": "Suspicious PowerShell Encoded Command", "severity": "high"}
+    },
+    {
+      "id": "alert_002",
+      "title": "Lateral movement via SMB detected",
+      "excerpt": "SMB lateral movement attempt from compromised host to domain controller DC-PROD-01",
+      "fieldPreview": {"host.name": "SERVER-WEB-01", "rule.name": "SMB Lateral Movement", "severity": "critical"}
+    },
+    {
+      "id": "alert_003",
+      "title": "Failed authentication spike - admin account",
+      "excerpt": "128 failed login attempts against administrator@corp.example in 5 minute window",
+      "fieldPreview": {"user.name": "administrator@corp.example", "rule.name": "Brute Force Detection", "severity": "high"}
+    }
+  ],
+  "baselineEvalCount": 127,
+  "baselineReady": true
+}

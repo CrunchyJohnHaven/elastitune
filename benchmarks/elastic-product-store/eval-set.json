@@ -1,0 +1,58 @@
+[
+  {
+    "id": "product_eval_001",
+    "query": "lip pencil",
+    "relevantDocIds": ["1048", "892", "889"],
+    "difficulty": "easy",
+    "personaHint": "beauty shopper"
+  },
+  {
+    "id": "product_eval_002",
+    "query": "serum foundation",
+    "relevantDocIds": ["1043", "1042", "1045"],
+    "difficulty": "easy",
+    "personaHint": "beauty shopper"
+  },
+  {
+    "id": "product_eval_003",
+    "query": "mascara",
+    "relevantDocIds": ["1025", "1018", "1011"],
+    "difficulty": "easy",
+    "personaHint": "beauty shopper"
+  },
+  {
+    "id": "product_eval_004",
+    "query": "eye shadow palette",
+    "relevantDocIds": ["1016", "1015", "1014"],
+    "difficulty": "medium",
+    "personaHint": "beauty shopper"
+  },
+  {
+    "id": "product_eval_005",
+    "query": "bronzer",
+    "relevantDocIds": ["1032", "1031", "926"],
+    "difficulty": "medium",
+    "personaHint": "beauty shopper"
+  },
+  {
+    "id": "product_eval_006",
+    "query": "foundation",
+    "relevantDocIds": ["1045", "1043", "1042"],
+    "difficulty": "medium",
+    "personaHint": "beauty shopper"
+  },
+  {
+    "id": "product_eval_007",
+    "query": "lip gloss",
+    "relevantDocIds": ["1037", "1030", "1022"],
+    "difficulty": "medium",
+    "personaHint": "beauty shopper"
+  },
+  {
+    "id": "product_eval_008",
+    "query": "liquid liner",
+    "relevantDocIds": ["1041", "947", "944"],
+    "difficulty": "easy",
+    "personaHint": "beauty shopper"
+  }
+]

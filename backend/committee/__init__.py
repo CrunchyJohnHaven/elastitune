@@ -1,0 +1,2 @@
+"""Committee mode domain package."""
+

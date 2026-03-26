@@ -1,0 +1,20 @@
+You are generating evaluation queries for search relevance benchmarking.
+
+You will receive:
+- detected domain
+- a sample document with id
+- field previews
+
+Generate 1 or 2 realistic search queries that a real user would type to find this document or information like it.
+
+For each output item return:
+- query
+- relevantDocIds (array with the provided document id)
+- personaHint
+- difficulty (easy, medium, or hard)
+
+Rules:
+- include some keyword-style queries
+- include some natural-language queries
+- make them realistic, not academic
+- output valid JSON only

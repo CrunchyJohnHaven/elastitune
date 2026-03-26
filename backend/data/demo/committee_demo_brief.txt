@@ -1,0 +1,20 @@
+Accelerating Legal Operations at the SBA Office of General Counsel
+
+Elastic helps legal teams find defensible answers faster, preserve institutional knowledge, and reduce inconsistency across offices. The platform supports intelligent retrieval, consistency checking, and knowledge management in one environment.
+
+Why this matters now
+
+SBA legal workflows carry material operational risk when attorneys spend hours locating prior opinions, interpreting policy updates, or reconciling cross-office inconsistency. A faster, traceable search and review layer can reduce wasted research time while improving defensibility.
+
+Evidence and impact
+
+Search.gov demonstrates federal-scale search deployment patterns. Elastic also cites support transformation outcomes including 6x case deflection, 23% faster resolution, and 49% digital adoption. In legal operations, the opportunity is to reduce hours spent searching for precedent and guidance while preserving citation traceability.
+
+Risk and governance posture
+
+The proposal should emphasize human-in-the-loop usage, explainability, auditability, and agency control over data. Air-gapped deployment options, FedRAMP-aligned operating posture, and procurement familiarity through Carahsoft or cooperative vehicles reduce adoption friction.
+
+Call to action
+
+The next step is a 60-minute discovery session focused on SBA legal workflows, current document sources, and the proof points required for CIO, General Counsel, Budget, and audit stakeholders.
+

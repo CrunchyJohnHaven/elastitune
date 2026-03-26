@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+.venv/
+venv/
+env/
+
+# Node
+node_modules/
+frontend/dist/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Benchmarks (cloned repos)
+.benchmarks/
+
+# Temp files
+tmp/
+*.tmp
+
+# SQLite databases
+*.db
+*.db-journal
+*.db-wal
+
+# Claude Code
+.claude/

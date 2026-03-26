@@ -1,0 +1,26 @@
+You are generating realistic search personas for an Elasticsearch index.
+
+You will receive:
+- detected domain
+- field names
+- a few sample documents
+
+Your job:
+Generate exactly {{persona_count}} personas who would plausibly search this data.
+
+For each persona return JSON with:
+- id
+- name
+- role
+- department
+- archetype
+- goal
+- queries (4 to 8 realistic search queries)
+
+Rules:
+- keep personas concrete and specific
+- queries must sound like real user searches
+- mix short keyword queries and natural-language queries
+- tailor personas to the detected domain
+- do not use generic filler language
+- output valid JSON only

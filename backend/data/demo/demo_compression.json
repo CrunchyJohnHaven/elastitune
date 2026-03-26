@@ -1,0 +1,46 @@
+{
+  "available": true,
+  "vectorField": "embedding",
+  "vectorDims": 768,
+  "methods": [
+    {
+      "method": "float32",
+      "sizeBytes": 7477002240,
+      "recallAt10": 1.0,
+      "estimatedMonthlyCostUsd": 0.71,
+      "sizeReductionPct": 0.0,
+      "status": "done",
+      "note": null
+    },
+    {
+      "method": "int8",
+      "sizeBytes": 1869250560,
+      "recallAt10": 0.997,
+      "estimatedMonthlyCostUsd": 0.18,
+      "sizeReductionPct": 75.0,
+      "status": "done",
+      "note": null
+    },
+    {
+      "method": "int4",
+      "sizeBytes": 934625280,
+      "recallAt10": 0.973,
+      "estimatedMonthlyCostUsd": 0.089,
+      "sizeReductionPct": 87.5,
+      "status": "done",
+      "note": null
+    },
+    {
+      "method": "rotated_int4",
+      "sizeBytes": 934625280,
+      "recallAt10": 0.988,
+      "estimatedMonthlyCostUsd": 0.089,
+      "sizeReductionPct": 87.5,
+      "status": "done",
+      "note": "Random orthogonal rotation applied before quantization"
+    }
+  ],
+  "bestRecommendation": "rotated_int4",
+  "projectedMonthlySavingsUsd": 0.621,
+  "status": "done"
+}
