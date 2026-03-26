@@ -33,7 +33,7 @@ function fg(score: number): string {
 export default function MitreCoverageHeatmap({ report }: MitreCoverageHeatmapProps) {
   const tactics = useMemo(() => {
     return TACTIC_RULES.map((rule) => {
-      const queries = report.queryBreakdown.filter((query) =>
+      const queries = (report.queryBreakdown ?? []).filter((query) =>
         rule.tokens.some((token) => query.query.toLowerCase().includes(token))
       );
       const score = queries.length
