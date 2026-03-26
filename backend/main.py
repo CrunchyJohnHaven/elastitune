@@ -67,7 +67,18 @@ app.include_router(ws_runs.router)  # WebSocket — no /api prefix
 # Static files (production frontend)
 # ---------------------------------------------------------------------------
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 frontend_dist = (Path(__file__).parent.parent / "frontend" / "dist").resolve()
+if not frontend_dist.exists():
+    logger.warning(
+        "Frontend dist directory not found at %s. "
+        "Run 'npm run build' inside the frontend/ directory to build the UI. "
+        "Only the API will be available until the frontend is built.",
+        frontend_dist,
+    )
 if frontend_dist.exists():
     assets_dir = frontend_dist / "assets"
     if assets_dir.exists():

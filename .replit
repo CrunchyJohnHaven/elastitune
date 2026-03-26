@@ -13,7 +13,7 @@ run = ["bash", "run.sh"]
 build = ["bash", "setup.sh"]
 
 [env]
-ELASTICSEARCH_URL = "http://127.0.0.1:9200"
+ES_URL = "http://127.0.0.1:9200"
 
 [[ports]]
 localPort = 8000

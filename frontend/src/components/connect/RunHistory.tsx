@@ -5,6 +5,7 @@ import { useToast } from '@/components/ui/ToastProvider';
 import { useAppStore } from '@/store/useAppStore';
 import type { ReportPayload, SearchRunListItem } from '@/types/contracts';
 import { PANEL_BORDER } from '@/lib/theme';
+import { buildShareableReportHtml } from '@/lib/reportExport';
 
 function formatRelativeTime(value?: string | null): string {
   if (!value) return 'unknown';
@@ -44,6 +45,7 @@ export default function RunHistory() {
   const { setConnection, setRunId } = useAppStore();
   const [runs, setRuns] = useState<SearchRunListItem[]>([]);
   const [loadingRunId, setLoadingRunId] = useState<string | null>(null);
+  const [exportingRunId, setExportingRunId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -94,6 +96,27 @@ export default function RunHistory() {
       toast.error(error instanceof Error ? error.message : 'Failed to continue saved run.');
     } finally {
       setLoadingRunId(null);
+    }
+  };
+
+  const handleExport = async (run: SearchRunListItem) => {
+    setExportingRunId(run.run_id);
+    try {
+      const report = await api.getReport(run.run_id);
+      const html = buildShareableReportHtml(report);
+      const blob = new Blob([html], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `elastitune-report-${run.run_id}.html`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to export report.');
+    } finally {
+      setExportingRunId(null);
     }
   };
 
@@ -198,6 +221,24 @@ export default function RunHistory() {
                 }}
               >
                 View Report
+              </button>
+              <button
+                type="button"
+                onClick={() => { void handleExport(run); }}
+                disabled={exportingRunId === run.run_id}
+                style={{
+                  padding: '8px 10px',
+                  borderRadius: 8,
+                  border: `1px solid ${PANEL_BORDER}`,
+                  background: 'transparent',
+                  color: '#9AA4B2',
+                  fontFamily: 'Inter, sans-serif',
+                  fontSize: 11,
+                  cursor: exportingRunId === run.run_id ? 'not-allowed' : 'pointer',
+                  opacity: exportingRunId === run.run_id ? 0.7 : 1,
+                }}
+              >
+                {exportingRunId === run.run_id ? 'Exporting…' : 'Export'}
               </button>
               <button
                 type="button"

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAppStore } from '@/store/useAppStore';
 import { formatScore, formatPercent, formatDuration, formatDollars, truncate, getDisplayElapsedSeconds } from '@/lib/format';
 import { PANEL_BORDER, ACCENT_BLUE, TEXT_SECONDARY, TEXT_DIM } from '@/lib/theme';
@@ -272,8 +273,9 @@ export default function TopTelemetryBar() {
           overflow: 'hidden',
         }}
       >
-        {/* Logo block */}
-        <div
+        {/* Logo block — clicking navigates home */}
+        <Link
+          to="/"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -281,7 +283,12 @@ export default function TopTelemetryBar() {
             borderRight: `1px solid ${PANEL_BORDER}`,
             gap: 6,
             flexShrink: 0,
+            textDecoration: 'none',
+            transition: 'opacity 0.15s',
           }}
+          onMouseEnter={e => ((e.currentTarget as HTMLAnchorElement).style.opacity = '0.75')}
+          onMouseLeave={e => ((e.currentTarget as HTMLAnchorElement).style.opacity = '1')}
+          title="Back to Dashboard"
         >
           <div
             style={{
@@ -303,7 +310,7 @@ export default function TopTelemetryBar() {
           >
             ElastiTune
           </span>
-        </div>
+        </Link>
 
         <TelemetryBlock
           label="MODE"

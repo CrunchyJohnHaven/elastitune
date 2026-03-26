@@ -19,18 +19,18 @@ class Settings(BaseSettings):
     persona_batch_interval_seconds: float = 1.5
     host: str = "0.0.0.0"
     port: int = 8000
-    cors_origins: List[str] = Field(default_factory=lambda: ["http://localhost:5173"])
+    cors_origins: List[str] = Field(default_factory=lambda: ["*"])
 
     @field_validator("cors_origins", mode="before")
     @classmethod
     def _parse_cors_origins(cls, value: object) -> List[str]:
         if value is None:
-            return ["http://localhost:5173"]
+            return ["*"]
         if isinstance(value, str):
             return [origin.strip() for origin in value.split(",") if origin.strip()]
         if isinstance(value, (list, tuple)):
             return [str(origin).strip() for origin in value if str(origin).strip()]
-        return ["http://localhost:5173"]
+        return ["*"]
 
 
 settings = Settings()

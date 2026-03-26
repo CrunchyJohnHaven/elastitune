@@ -416,6 +416,28 @@ export default function ReportScreen() {
               Back to Run
             </Link>
 
+            <Link
+              to="/"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 5,
+                fontFamily: 'Inter, sans-serif',
+                fontSize: 12,
+                color: '#6B7480',
+                textDecoration: 'none',
+                transition: 'color 0.15s',
+              }}
+              onMouseEnter={e =>
+                ((e.currentTarget as HTMLAnchorElement).style.color = '#EEF3FF')
+              }
+              onMouseLeave={e =>
+                ((e.currentTarget as HTMLAnchorElement).style.color = '#6B7480')
+              }
+            >
+              Dashboard
+            </Link>
+
             <div
               style={{
                 width: 1,
