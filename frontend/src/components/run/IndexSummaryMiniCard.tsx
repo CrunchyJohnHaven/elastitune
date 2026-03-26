@@ -1,6 +1,6 @@
 import React, { memo, useEffect, useState } from 'react';
 import type { ConnectionSummary, HeroMetrics, SearchProfile } from '@/types/contracts';
-import { formatDocCount, formatDuration, truncate } from '@/lib/format';
+import { formatDocCount, formatDuration, truncate, getDisplayElapsedSeconds } from '@/lib/format';
 import { PANEL_BORDER } from '@/lib/theme';
 
 interface IndexSummaryMiniCardProps {
@@ -8,6 +8,9 @@ interface IndexSummaryMiniCardProps {
   metrics: HeroMetrics;
   mode: 'demo' | 'live';
   profile: SearchProfile;
+  stage?: string;
+  startedAt?: string | null;
+  completedAt?: string | null;
 }
 
 function InfoRow({ label, value }: { label: string; value: string }) {
@@ -55,6 +58,9 @@ function IndexSummaryMiniCard({
   metrics,
   mode,
   profile,
+  stage,
+  startedAt,
+  completedAt,
 }: IndexSummaryMiniCardProps) {
   const [, forceUpdate] = useState(0);
   useEffect(() => {
@@ -121,7 +127,14 @@ function IndexSummaryMiniCard({
       <InfoRow label="Vector field" value={vectorField} />
       <InfoRow
         label="Elapsed"
-        value={formatDuration(metrics.elapsedSeconds)}
+        value={formatDuration(
+          getDisplayElapsedSeconds({
+            metricsElapsedSeconds: metrics.elapsedSeconds,
+            startedAt,
+            completedAt,
+            stage,
+          })
+        )}
       />
       <InfoRow label="Search mode" value={searchMode} />
     </div>
