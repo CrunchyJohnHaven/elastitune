@@ -44,9 +44,10 @@ docker compose up --build
 
 - [Local development workflow](docs/CONTRIBUTING.md)
 - [Committee mode overview](docs/committee.md)
+- [Executive Summary](docs/executive-summary.md)
 - [API reference](docs/api-reference.md)
 - [Benchmark guide](BENCHMARKS.md)
-- [GitHub research notes](docs/research/github-projects.md)
+- [GitHub research notes](docs/github-research.md)
 - [Task map](CODEX_TASKS.md)
 
 ## Testing
@@ -78,7 +79,6 @@ Five benchmark datasets are bundled. Use `python3 benchmarks/setup.py` to load t
 
 ## More Docs
 
-- [Executive Summary](docs/executive-summary.md)
 - [Demo narrative](docs/demo-narrative.md)
 - [API reference](docs/api-reference.md)
 - [Committee mode guide](docs/committee.md)

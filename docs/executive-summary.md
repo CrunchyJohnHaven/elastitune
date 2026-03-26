@@ -1,20 +1,13 @@
 # Executive Summary
 
-ElastiTune exists to make search tuning easy to understand in one sitting.
+The report’s executive summary is rendered by [frontend/src/components/report/ExecutiveSummary.tsx](../frontend/src/components/report/ExecutiveSummary.tsx).
 
-The demo story is:
+It highlights:
 
-1. Connect to an Elasticsearch index or select a bundled benchmark.
-2. Watch ElastiTune measure the baseline and test a stream of candidate profile changes.
-3. Keep only the changes that improve relevance.
-4. Review a report that shows what changed, what improved, and what to do next.
+- the headline,
+- baseline score,
+- best score,
+- improvement percentage,
+- and the recommended next steps.
 
-For the live demo, lead with the happy path and only open the deeper screens when a viewer asks for details.
-
-## What To Emphasize
-
-- The app is measurable, not magical.
-- Each experiment is logged and reversible.
-- Persona reactions make the result easy to explain to non-search specialists.
-- The final report is shareable and can be reused as a decision memo.
-
+Use it as the first stop when you want a quick read on what changed and why the tuning run matters.
