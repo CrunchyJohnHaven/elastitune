@@ -184,7 +184,7 @@ async def get_report(run_id: str, request: Request) -> JSONResponse:
 
     if ctx.report is None:
         persisted = await run_manager.get_report(run_id)
-        ctx.report = persisted or ReportService().generate(ctx)
+        ctx.report = persisted or await ReportService().generate_async(ctx)
 
     return JSONResponse(
         content=orjson.loads(ctx.report.model_dump_json()),

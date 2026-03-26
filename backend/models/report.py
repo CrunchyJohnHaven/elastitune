@@ -1,5 +1,6 @@
-from pydantic import BaseModel
-from typing import Optional, List
+from typing import Dict, List, Literal, Optional
+
+from pydantic import BaseModel, Field
 from .contracts import (
     CompressionSummary,
     ConnectionSummary,
@@ -39,6 +40,64 @@ class PersonaImpactRow(BaseModel):
     deltaPct: float
 
 
+class ReportNarrativeSection(BaseModel):
+    key: str
+    title: str
+    body: str
+    audience: Literal["executive", "operator", "technical"] = "executive"
+    source: Literal["deterministic", "llm"] = "deterministic"
+    confidence: float = 0.0
+
+
+class PersonaSummaryDetail(BaseModel):
+    personaCount: int = 0
+    archetypeCounts: Dict[str, int] = Field(default_factory=dict)
+    topRoles: List[str] = Field(default_factory=list)
+    explanation: str
+
+
+class ReportChangeNarrative(BaseModel):
+    path: str
+    title: str
+    plainEnglish: str
+    before: str
+    after: str
+    expectedEffect: str
+    whyItHelped: str
+    confidence: float = 0.0
+    evidence: List[str] = Field(default_factory=list)
+
+
+class ReportCodeLine(BaseModel):
+    lineNumber: int
+    content: str
+    changed: bool = False
+    explanation: Optional[str] = None
+
+
+class ReportCodeSnippet(BaseModel):
+    title: str
+    target: str
+    format: str = "json"
+    summary: str
+    beforeLines: List[ReportCodeLine] = Field(default_factory=list)
+    afterLines: List[ReportCodeLine] = Field(default_factory=list)
+
+
+class ReportImplementationGuide(BaseModel):
+    summary: str
+    applyInstructions: List[str] = Field(default_factory=list)
+    representativeQuery: Optional[str] = None
+    note: Optional[str] = None
+    snippets: List[ReportCodeSnippet] = Field(default_factory=list)
+
+
+class ReportValidationNote(BaseModel):
+    title: str
+    body: str
+    severity: Literal["success", "info", "warning"] = "info"
+
+
 class ReportSummary(BaseModel):
     headline: str
     overview: str
@@ -51,6 +110,10 @@ class ReportSummary(BaseModel):
     durationSeconds: float = 0.0
     projectedMonthlySavingsUsd: Optional[float] = None
     modelId: Optional[str] = None  # Embedding model used in the best profile
+    personaCount: int = 0
+    queriesImproved: int = 0
+    queriesRegressed: int = 0
+    confidenceScore: float = 0.0
     # Continuation tracking — populated when this run continued from a previous one
     isContinuation: bool = False
     originalBaselineScore: Optional[float] = None
@@ -91,6 +154,11 @@ class ReportPayload(BaseModel):
     diff: List[SearchProfileChange]
     queryBreakdown: List[QueryBreakdownRow] = []
     personaImpact: List[PersonaImpactRow]
+    narrative: List[ReportNarrativeSection] = Field(default_factory=list)
+    personaSummary: Optional[PersonaSummaryDetail] = None
+    changeNarratives: List[ReportChangeNarrative] = Field(default_factory=list)
+    implementationGuide: Optional[ReportImplementationGuide] = None
+    validationNotes: List[ReportValidationNote] = Field(default_factory=list)
     experiments: List[ExperimentRecord]
     compression: CompressionSummary
     warnings: List[str] = []

@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 
-from backend.models.contracts import ExperimentRecord, SearchProfileChange
+from backend.models.contracts import (
+    ExperimentRecord,
+    PersonaViewModel,
+    SearchProfileChange,
+)
 from backend.models.runtime import RunContext
 from backend.services.demo_service import DemoService
 from backend.services.report_service import ReportService
@@ -112,6 +116,8 @@ class TestReportServiceBasic:
         assert report.summary.nextSteps[0].startswith(
             "Review the accepted profile changes"
         )
+        assert report.summary.confidenceScore > 0.5
+        assert report.summary.personaCount == 0
 
     def test_non_continuation_flags_are_false(self) -> None:
         ctx = _make_ctx()
@@ -165,6 +171,37 @@ class TestReportServiceBasic:
 
         assert "for about" in report.summary.overview
         assert "ran 1 experiments" in report.summary.overview
+
+    def test_report_includes_plain_english_narrative_sections(self) -> None:
+        ctx = _make_ctx()
+        report = ReportService().generate(ctx)
+
+        section_keys = [section.key for section in report.narrative]
+        assert "plain_english_summary" in section_keys
+        assert "implementation_readout" in section_keys
+
+    def test_report_includes_implementation_guide_with_line_numbers(self) -> None:
+        ctx = _make_ctx()
+        ctx.baseline_profile.phraseBoost = 0.0
+        ctx.best_profile.phraseBoost = 1.0
+        report = ReportService().generate(ctx)
+
+        assert report.implementationGuide is not None
+        assert report.implementationGuide.snippets
+        snippet = report.implementationGuide.snippets[0]
+        assert snippet.beforeLines[0].lineNumber == 1
+        assert snippet.afterLines[0].lineNumber == 1
+        assert any(line.changed for line in snippet.afterLines)
+
+    def test_report_includes_change_narratives(self) -> None:
+        ctx = _make_ctx()
+        ctx.baseline_profile.phraseBoost = 0.0
+        ctx.best_profile.phraseBoost = 1.0
+        report = ReportService().generate(ctx)
+
+        assert report.changeNarratives
+        assert "phrase" in report.changeNarratives[0].plainEnglish.lower()
+        assert report.changeNarratives[0].confidence > 0.5
 
 
 # ------------------------------------------------------------------
@@ -410,6 +447,38 @@ class TestReportServiceEdgeCases:
         reason = svc._infer_failure_reason(0.3, 0.5, [])
         assert reason is None
 
+    def test_persona_summary_counts_roles(self) -> None:
+        ctx = _make_ctx()
+        persona_a = PersonaViewModel(
+            id="p1",
+            name="Analyst",
+            role="Security Analyst",
+            department="Security",
+            archetype="Expert",
+            goal="Find high-risk issues",
+            orbit=1,
+            colorSeed=1,
+            queries=["critical cve", "urgent patch"],
+        )
+        persona_b = PersonaViewModel(
+            id="p2",
+            name="Architect",
+            role="Security Architect",
+            department="Security",
+            archetype="Expert",
+            goal="Design safe systems",
+            orbit=2,
+            colorSeed=2,
+            queries=["identity architecture", "network segmentation"],
+        )
+        ctx.personas = [persona_a, persona_b]
+
+        report = ReportService().generate(ctx)
+
+        assert report.personaSummary is not None
+        assert report.personaSummary.personaCount == 2
+        assert "Security Analyst" in report.personaSummary.topRoles
+
 
 # ------------------------------------------------------------------
 # Serialization roundtrip tests
@@ -468,3 +537,5 @@ class TestReportSerialization:
         assert data["summary"]["baselineScore"] == 0.459
         assert data["summary"]["bestScore"] == 0.595
         assert data["summary"]["improvementPct"] > 25  # Cumulative ~29.6%
+        assert "narrative" in data
+        assert "implementationGuide" in data

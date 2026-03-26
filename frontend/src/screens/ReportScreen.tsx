@@ -6,6 +6,8 @@ import { useToast } from '@/components/ui/ToastProvider';
 import { api } from '@/lib/api';
 import type { ReportPayload } from '@/types/contracts';
 import ExecutiveSummary from '@/components/report/ExecutiveSummary';
+import ReportInsights from '@/components/report/ReportInsights';
+import ImplementationGuide from '@/components/report/ImplementationGuide';
 import ImprovementGraph from '@/components/report/ImprovementGraph';
 import MitreCoverageHeatmap from '@/components/report/MitreCoverageHeatmap';
 import SearchProfileDiff from '@/components/report/SearchProfileDiff';
@@ -652,6 +654,15 @@ export default function ReportScreen() {
         >
           {/* Executive Summary */}
           <ExecutiveSummary report={report} />
+          <ReportInsights
+            narrative={report.narrative}
+            personaSummary={report.personaSummary}
+            changeNarratives={report.changeNarratives}
+            validationNotes={report.validationNotes}
+            confidence={report.summary.confidenceScore}
+            personaCount={report.summary.personaCount}
+          />
+          <ImplementationGuide guide={report.implementationGuide} />
           <ImprovementGraph report={report} />
           <MitreCoverageHeatmap report={report} />
 

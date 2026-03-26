@@ -80,6 +80,21 @@ export default function ExecutiveSummary({ report }: ExecutiveSummaryProps) {
     timeStyle: 'short',
   });
 
+  const confidenceLabel =
+    summary.confidenceScore == null
+      ? null
+      : `${Math.max(
+          0,
+          Math.min(
+            100,
+            Math.round(
+              summary.confidenceScore <= 1
+                ? summary.confidenceScore * 100
+                : summary.confidenceScore
+            )
+          )
+        )}% confidence`;
+
   const formatDuration = (durationSeconds: number) => {
     if (!durationSeconds || durationSeconds <= 0) return '—';
     if (durationSeconds < 60) return `${Math.max(1, Math.round(durationSeconds))} sec`;
@@ -179,6 +194,52 @@ export default function ExecutiveSummary({ report }: ExecutiveSummaryProps) {
                 }}
               >
                 {summary.modelId}
+              </span>
+            </>
+          )}
+          {confidenceLabel && (
+            <>
+              {' · '}
+              <span
+                style={{
+                  fontFamily: 'Inter, sans-serif',
+                  fontSize: 11,
+                  color: '#9AA4B2',
+                }}
+              >
+                Confidence:{' '}
+              </span>
+              <span
+                style={{
+                  fontFamily: 'JetBrains Mono, monospace',
+                  fontSize: 11,
+                  color: '#4ADE80',
+                }}
+              >
+                {confidenceLabel}
+              </span>
+            </>
+          )}
+          {summary.personaCount != null && (
+            <>
+              {' · '}
+              <span
+                style={{
+                  fontFamily: 'Inter, sans-serif',
+                  fontSize: 11,
+                  color: '#9AA4B2',
+                }}
+              >
+                Personas:{' '}
+              </span>
+              <span
+                style={{
+                  fontFamily: 'JetBrains Mono, monospace',
+                  fontSize: 11,
+                  color: '#7CE7FF',
+                }}
+              >
+                {summary.personaCount}
               </span>
             </>
           )}
@@ -340,6 +401,18 @@ export default function ExecutiveSummary({ report }: ExecutiveSummaryProps) {
               accent="#4ADE80"
             />
           )}
+        {summary.queriesImproved != null && (
+          <MetricCard
+            label="Queries Improved"
+            value={String(summary.queriesImproved)}
+            sub={
+              summary.queriesRegressed != null
+                ? `${summary.queriesRegressed} regressed`
+                : undefined
+            }
+            accent="#4ADE80"
+          />
+        )}
       </div>
     </div>
   );

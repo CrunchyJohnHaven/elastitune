@@ -278,7 +278,7 @@ class SearchTaskRunner:
 
         ctx.stage = "completed"
         ctx.completed_at = now_ts()
-        ctx.report = ReportService().generate(ctx)
+        ctx.report = await ReportService().generate_async(ctx)
         await self.manager._persist_search_run(run_id)
         if self.manager.persistence and ctx.report:
             await self.manager.persistence.save_report(ctx.report)
