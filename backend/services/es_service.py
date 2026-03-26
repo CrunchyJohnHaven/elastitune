@@ -80,6 +80,45 @@ class ESService:
             logger.error("search failed for index '%s': %s", index, exc)
             return {"hits": {"hits": [], "total": {"value": 0}}}
 
+    async def msearch_profile_queries(
+        self,
+        index: str,
+        eval_cases: List[Any],
+        profile: Any,
+        size: int = 10,
+    ) -> Dict[str, List[str]]:
+        from ..models.contracts import SearchProfile
+
+        if isinstance(profile, dict):
+            parsed_profile = SearchProfile(**profile)
+        else:
+            parsed_profile = profile
+
+        searches: List[Dict[str, Any]] = []
+        for case in eval_cases:
+            searches.append({"index": index})
+            searches.append(self._build_query_body(case.query, parsed_profile, size))
+
+        try:
+            response = await self.client.msearch(
+                searches=searches,
+                max_concurrent_searches=min(len(eval_cases), 10),
+                max_concurrent_shard_requests=5,
+            )
+        except TypeError:
+            response = await self.client.msearch(
+                body=searches,
+                max_concurrent_searches=min(len(eval_cases), 10),
+                max_concurrent_shard_requests=5,
+            )
+
+        items = response.get("responses", [])
+        results: Dict[str, List[str]] = {}
+        for case, item in zip(eval_cases, items):
+            hits = item.get("hits", {}).get("hits", []) if isinstance(item, dict) else []
+            results[case.id] = [str(hit.get("_id", "")) for hit in hits if hit.get("_id") is not None]
+        return results
+
     async def close(self) -> None:
         try:
             await self.client.close()

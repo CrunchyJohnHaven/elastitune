@@ -58,6 +58,8 @@ class CommitteeRunContext:
         duration_minutes: int = 4,
         auto_stop_on_plateau: bool = True,
         do_no_harm_floor: float = -0.05,
+        persona_weighting_mode: str = "authority",
+        reaction_memory_weight: float = 0.25,
         score_thresholds: Optional[CommitteeScoreThresholds] = None,
     ) -> None:
         self.run_id = run_id
@@ -83,6 +85,8 @@ class CommitteeRunContext:
         self.duration_minutes = duration_minutes
         self.auto_stop_on_plateau = auto_stop_on_plateau
         self.do_no_harm_floor = do_no_harm_floor
+        self.persona_weighting_mode = persona_weighting_mode
+        self.reaction_memory_weight = reaction_memory_weight
         self.score_thresholds = score_thresholds or CommitteeScoreThresholds()
         self.metrics.doNoHarmFloor = do_no_harm_floor
         self.cancel_flag = asyncio.Event()

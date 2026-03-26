@@ -1,68 +1,77 @@
 # Suggested Human Demo Narrative
 
-This script is meant for sales, solutions engineering, and onboarding teams.
+Use this script when presenting ElastiTune to sales, engineering, or internal leadership.
 
-## Opening
+## 1. Open With The Problem
 
-Start with the connect screen and say:
+Tell the audience that search tuning is usually slow, subjective, and hard to explain.
 
-- "ElastiTune is a live search tuner."
-- "We can either launch a guided demo or point it at a real Elasticsearch index."
-- "The system measures relevance before it changes anything."
+Then explain that ElastiTune turns the work into a live optimization demo with two modes:
 
-## Step 1: Launch the demo
+- **Search mode** for relevance tuning
+- **Committee mode** for document persuasion and rewrite workflows
 
-Click `Launch Demo`.
+## 2. Show Search Mode First
 
-Emphasize:
+Recommended flow:
 
-- the fast path,
-- the live telemetry bar,
-- and the fact that the demo starts without any manual Elasticsearch setup.
+1. Connect to a benchmark or live Elasticsearch index.
+2. Point out the detected cluster summary.
+3. Start a run.
+4. Call attention to the live telemetry bar and experiment feed.
+5. Show how the score changes as the optimizer keeps or rejects experiments.
+6. Open the report when the run completes.
 
-## Step 2: Point out the live scoring
+What to emphasize:
 
-Call out:
+- The app shows why a change was kept.
+- The score is live, not a static screenshot.
+- The report is generated from the run itself.
 
-- nDCG@10,
-- queries tested,
-- kept vs. run counts,
-- and elapsed time.
+## 3. Explain The Happy Path
 
-Tell the audience that the numbers update while the run is in flight, not after the fact.
+The happy path is short and easy to remember:
 
-## Step 3: Explain the persona view
+1. Connect.
+2. Run.
+3. Review.
+4. Export.
 
-Highlight the persona cards and the fish-tank canvas.
+That sequence is the same mental model in both modes, which helps the product feel simple even when the internals are sophisticated.
 
-Say:
+## 4. Switch To Committee Mode
 
-- each persona represents a different type of searcher,
-- personas can resolve, partially resolve, or miss,
-- and the visual changes show who benefits from each tweak.
+Use committee mode when the audience wants to see a more boardroom-oriented story.
 
-## Step 4: Show the optimization loop
+Walk through:
 
-Pause on a few experiments and explain:
+1. Upload a proposal or brief.
+2. Show the generated personas.
+3. Start the committee run.
+4. Read one or two objections out loud.
+5. Show how a rewrite addresses the concern.
+6. Highlight the improved score and final export.
 
-- ElastiTune tries a small change,
-- it checks whether relevance improves,
-- and it keeps only the changes that help.
+What to emphasize:
 
-If the demo is in committee mode, explain that the same pattern applies to rewrite decisions and persona reactions.
+- Personas make feedback feel concrete.
+- The rewrite loop is visible and explainable.
+- The app helps teams improve language, not just numbers.
 
-## Step 5: Review the report
+## 5. Suggested Talk Track
 
-Open the report and emphasize:
+Use short lines like these:
 
-- executive summary,
-- before / after diff,
-- export options,
-- and the ability to continue from the best profile.
+- "This is the baseline."
+- "This is the experiment we kept."
+- "Here is why the committee objected."
+- "Here is the revision that moved the score."
+- "This is the report we can hand to a stakeholder."
 
-## Closing line
+## 6. Closing
 
-Close with:
+End by pointing to the docs and the benchmark harness so the audience can see that the demo is repeatable.
 
-- "The point is not just to tune search once."
-- "It is to make improvement measurable, repeatable, and easy to explain."
+Good closing line:
+
+- "ElastiTune is not just a search toy. It is a repeatable workflow for proving relevance and document quality improvements."

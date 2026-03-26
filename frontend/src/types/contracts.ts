@@ -228,6 +228,7 @@ export interface RunConfig {
   maxExperiments: number;
   personaCount: number;
   autoStopOnPlateau: boolean;
+  optimizerStrategy?: 'heuristic' | 'adaptive_evolutionary';
 }
 
 export interface RunSnapshot {

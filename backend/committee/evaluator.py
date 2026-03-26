@@ -102,6 +102,8 @@ class CommitteeEvaluator:
         sections: List[DocumentSection],
         evaluations: Dict[tuple[int, str], SectionEvaluation],
         latest_section_id: Optional[int] = None,
+        previous_view: Optional[CommitteePersonaView] = None,
+        reaction_memory_weight: float = 0.0,
     ) -> CommitteePersonaView:
         per_section: List[PersonaSectionRollup] = []
         total_score = 0.0
@@ -146,6 +148,18 @@ class CommitteeEvaluator:
                 key=len,
                 default="",
             )
+        memory_weight = max(0.0, min(reaction_memory_weight, 0.8))
+        if previous_view is not None and memory_weight > 0:
+            average_score = (
+                average_score * (1.0 - memory_weight)
+                + previous_view.currentScore * memory_weight
+            )
+            if len(strongest_quote) < 18 and previous_view.reactionQuote:
+                strongest_quote = previous_view.reactionQuote
+            if not top_objection and previous_view.topObjection:
+                top_objection = previous_view.topObjection
+            all_flags = list(dict.fromkeys(all_flags + previous_view.riskFlags))
+            all_missing = list(dict.fromkeys(all_missing + previous_view.missing))
 
         sentiment = _score_to_sentiment(average_score, self.thresholds)
         evaluation_source = (

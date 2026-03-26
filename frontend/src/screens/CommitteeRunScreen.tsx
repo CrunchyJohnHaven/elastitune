@@ -8,6 +8,7 @@ import CommitteeSpaceCanvas from '@/components/committee/CommitteeSpaceCanvas';
 import CommitteeRightRail from '@/components/committee/CommitteeRightRail';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import SkeletonCard from '@/components/ui/SkeletonCard';
 import { useToast } from '@/components/ui/ToastProvider';
 import { useCommitteeRunSocket } from '@/hooks/useCommitteeRunSocket';
 import { useViewportWidth } from '@/hooks/useViewportWidth';
@@ -118,17 +119,17 @@ export default function CommitteeRunScreen() {
               background:
                 'radial-gradient(circle at 50% 12%, rgba(77,163,255,0.12) 0%, rgba(8,12,18,0.96) 52%, rgba(5,7,11,1) 100%)',
             }}
-          >
-            <div
-              style={{
-                width: 620,
-                maxWidth: 'calc(100vw - 48px)',
-                padding: '28px 30px',
-                borderRadius: 18,
-                background: 'rgba(8,12,18,0.78)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                boxShadow: '0 30px 80px rgba(0,0,0,0.32)',
-              }}
+            >
+              <div
+                style={{
+                  width: 620,
+                  maxWidth: 'calc(100vw - 48px)',
+                  padding: '28px 30px',
+                  borderRadius: 18,
+                  background: 'rgba(8,12,18,0.78)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  boxShadow: '0 30px 80px rgba(0,0,0,0.32)',
+                }}
               >
                 <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: '#6B7480', letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 10 }}>
                   Committee Launch
@@ -139,17 +140,13 @@ export default function CommitteeRunScreen() {
                 <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 14, color: '#9AA4B2', lineHeight: 1.6, marginBottom: 18 }}>
                   Parsing the document, establishing the baseline, then pacing the rewrite loop so you can actually watch the room react section by section.
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
-                  {[
-                    ['Status', loadingTimedOut ? 'Timed out' : socketStatus === 'reconnecting' ? 'Reconnecting' : socketStatus === 'dead' ? 'Connection lost' : 'Starting'],
-                    ['Mode', 'Full Committee'],
-                    ['Output', 'Live consensus'],
-                  ].map(([label, value]) => (
-                    <div key={label} style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.03)' }}>
-                      <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: '#6B7480', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 6 }}>{label}</div>
-                      <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 13, color: '#EEF3FF', fontWeight: 600 }}>{value}</div>
-                    </div>
-                  ))}
+                <div style={{ display: 'grid', gap: 12, marginTop: 18 }}>
+                  <SkeletonCard lines={2} height={92} compact />
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
+                    {Array.from({ length: 3 }).map((_, index) => (
+                      <SkeletonCard key={index} lines={1} height={72} compact titleWidth={84} />
+                    ))}
+                  </div>
                 </div>
                 {loadingTimedOut && (
                   <div style={{ marginTop: 18, display: 'flex', gap: 10 }}>
@@ -238,6 +235,9 @@ export default function CommitteeRunScreen() {
               <div style={{ position: 'absolute', top: 18, right: 18, display: 'flex', gap: 10, zIndex: 5 }}>
                 <Link to="/committee" style={{ padding: '8px 12px', borderRadius: 10, background: 'rgba(10,14,20,0.9)', border: '1px solid rgba(255,255,255,0.08)', color: '#EEF3FF', textDecoration: 'none', fontSize: 12, fontFamily: 'Inter, sans-serif' }}>
                   New Committee
+                </Link>
+                <Link to="/committee/history" style={{ padding: '8px 12px', borderRadius: 10, background: 'rgba(10,14,20,0.9)', border: '1px solid rgba(255,255,255,0.08)', color: '#EEF3FF', textDecoration: 'none', fontSize: 12, fontFamily: 'Inter, sans-serif' }}>
+                  History
                 </Link>
                 <button
                   onClick={() => setShowStopConfirm(true)}

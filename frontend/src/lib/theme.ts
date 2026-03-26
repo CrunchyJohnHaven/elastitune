@@ -12,6 +12,25 @@ export function personaGlowColor(colorSeed: number): string {
   return `hsla(${hue.toFixed(0)}, 70%, 60%, 0.4)`;
 }
 
+export const FONT_UI =
+  '"Inter", "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif';
+export const FONT_MONO =
+  '"JetBrains Mono", "SFMono-Regular", "Consolas", monospace';
+
+export const SURFACE_BG = 'rgba(10, 14, 20, 0.78)';
+export const SURFACE_BG_STRONG = 'rgba(5, 7, 11, 0.92)';
+export const SURFACE_BORDER = 'rgba(255,255,255,0.08)';
+export const FOCUS_RING = '0 0 0 2px rgba(77, 163, 255, 0.35)';
+
+export const SPACE = {
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 24,
+  xxl: 32,
+} as const;
+
 // State colors
 export const STATE_COLORS = {
   idle: 'rgba(154, 164, 178, 0.7)',
@@ -31,8 +50,8 @@ export const STATE_GLOW_COLORS = {
   reacting: 'rgba(255, 255, 255, 0.4)',
 } as const;
 
-export const PANEL_BG = 'rgba(10, 14, 20, 0.78)';
-export const PANEL_BORDER = 'rgba(255,255,255,0.08)';
+export const PANEL_BG = SURFACE_BG;
+export const PANEL_BORDER = SURFACE_BORDER;
 export const TEXT_PRIMARY = '#EEF3FF';
 export const TEXT_SECONDARY = '#9AA4B2';
 export const TEXT_DIM = '#6B7480';

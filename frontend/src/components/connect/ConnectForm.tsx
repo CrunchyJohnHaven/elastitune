@@ -8,7 +8,7 @@ import type {
   LlmConfig,
   SearchRunListItem,
 } from '@/types/contracts';
-import { PANEL_BORDER, ACCENT_BLUE } from '@/lib/theme';
+import { PANEL_BORDER, ACCENT_BLUE, FONT_UI, TEXT_PRIMARY } from '@/lib/theme';
 import { useWalkthroughStore } from '@/store/useWalkthroughStore';
 import { ELASTIC_PRODUCT_STORE_EVAL_SET } from '@/demo/elasticProductStoreEvalSet';
 import { BOOKS_CATALOG_EVAL_SET } from '@/demo/booksCatalogEvalSet';
@@ -141,8 +141,6 @@ function StyledInput({
   showToggle?: boolean;
 }) {
   const [show, setShow] = useState(false);
-  const actualType = showToggle && !show ? 'password' : type === 'password' && !show ? 'password' : 'text';
-
   return (
     <div style={{ position: 'relative' }}>
       <input
@@ -163,7 +161,7 @@ function StyledInput({
         <button
           type="button"
           onClick={() => setShow(s => !s)}
-          aria-label={show ? 'Hide password' : 'Show password'}
+          aria-label={show ? 'Hide secret value' : 'Show secret value'}
           style={{
             position: 'absolute',
             right: 10,
@@ -219,7 +217,11 @@ export default function ConnectForm({
   const customFieldsOpen =
     customOpen || (!benchmarkLoaded && (!!esUrl || !!indexName || !!apiKey || !!uploadedEvalSet || advancedOpen));
   const showBenchmarkConnectionHelp =
-    benchmarkLoaded && error?.includes('Cannot reach Elasticsearch cluster');
+    benchmarkLoaded && Boolean(error && (
+      error.includes('Elasticsearch') ||
+      error.includes('backend is temporarily unavailable') ||
+      error.includes('Cannot reach the backend')
+    ));
   const previousRunLookupIndex = useMemo(() => indexName.trim() || null, [indexName]);
 
   useEffect(() => {
@@ -346,11 +348,7 @@ export default function ConnectForm({
       const msg = normalizeErrorMessage(err, 'Could not analyze this search index.');
       // If Elasticsearch isn't running and user clicked "Run Benchmark",
       // silently fall back to demo mode so they still see the app working.
-      if (isBenchmarkAutoRun && (
-        msg.includes('Cannot reach the backend') ||
-        msg.includes('temporarily unavailable') ||
-        msg.includes('timed out')
-      )) {
+      if (isBenchmarkAutoRun && msg.includes('Elasticsearch is not responding')) {
         setIsLoading(false);
         await handleDemo();
       } else {
@@ -442,65 +440,61 @@ export default function ConnectForm({
   return (
     <form onSubmit={handleAnalyze} noValidate>
       {/* Primary CTA buttons — shown at the top for immediate visibility */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
         <button
-          type="button"
-          onClick={handleDemo}
-          aria-label="Launch the demo"
+          type="submit"
           disabled={isLoading}
           style={{
-            flex: '1 1 180px',
-            padding: '13px 14px',
+            flex: 1.15,
+            padding: '12px',
             background: isLoading
-              ? 'rgba(77,163,255,0.35)'
-              : 'linear-gradient(135deg, #4DA3FF 0%, #3A8FFF 100%)',
-            color: '#fff',
-            border: 'none',
-            borderRadius: 10,
-            fontFamily: 'Inter, sans-serif',
-            fontWeight: 700,
+              ? 'rgba(255,255,255,0.06)'
+              : 'rgba(255,255,255,0.05)',
+            color: '#EEF3FF',
+            border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: 8,
+            fontFamily: FONT_UI,
+            fontWeight: 600,
             fontSize: 13,
             cursor: isLoading ? 'not-allowed' : 'pointer',
-            boxShadow: isLoading ? 'none' : '0 0 20px rgba(77,163,255,0.35)',
+            boxShadow: 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             gap: 7,
-            transition: 'box-shadow 0.2s, transform 0.1s',
+            transition: 'background 0.2s, border-color 0.2s',
             opacity: isLoading ? 0.7 : 1,
           }}
           onMouseEnter={e => {
             if (!isLoading) {
-              (e.currentTarget as HTMLButtonElement).style.boxShadow =
-                '0 0 32px rgba(77,163,255,0.55)';
-              (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-1px)';
+              (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.08)';
+              (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.18)';
             }
           }}
           onMouseLeave={e => {
             if (!isLoading) {
-              (e.currentTarget as HTMLButtonElement).style.boxShadow =
-                '0 0 20px rgba(77,163,255,0.35)';
-              (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(0)';
+              (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.05)';
+              (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.12)';
             }
           }}
         >
           {isLoading && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />}
-          Launch Demo
+          {customFieldsOpen ? 'Analyze Search Index' : 'Run Benchmark'}
         </button>
 
         <button
-          type="submit"
-          aria-label={customFieldsOpen ? 'Analyze the search index' : 'Run the benchmark'}
+          type="button"
+          onClick={handleDemo}
           disabled={isLoading}
           style={{
-            flex: '1 1 180px',
-            padding: '13px 14px',
-            background: 'rgba(255,255,255,0.03)',
-            color: '#EEF3FF',
-            border: '1px solid rgba(255,255,255,0.11)',
-            borderRadius: 10,
-            fontFamily: 'Inter, sans-serif',
-            fontWeight: 600,
+            flex: 1.2,
+            padding: '12px',
+            background: 'linear-gradient(135deg, rgba(74,222,128,0.16), rgba(22,163,74,0.12))',
+            color: TEXT_PRIMARY,
+            border: '1px solid rgba(74,222,128,0.22)',
+            borderRadius: 8,
+            fontFamily: FONT_UI,
+            fontWeight: 700,
             fontSize: 13,
             cursor: isLoading ? 'not-allowed' : 'pointer',
             transition: 'color 0.15s, border-color 0.15s, background 0.15s',
@@ -508,28 +502,27 @@ export default function ConnectForm({
           }}
           onMouseEnter={e => {
             if (!isLoading) {
-              (e.currentTarget as HTMLButtonElement).style.color = '#EEF3FF';
-              (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.2)';
-              (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.06)';
+              (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(74,222,128,0.34)';
+              (e.currentTarget as HTMLButtonElement).style.background =
+                'linear-gradient(135deg, rgba(74,222,128,0.22), rgba(22,163,74,0.18))';
             }
           }}
           onMouseLeave={e => {
             if (!isLoading) {
-              (e.currentTarget as HTMLButtonElement).style.color = '#EEF3FF';
-              (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.1)';
-              (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.03)';
+              (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(74,222,128,0.22)';
+              (e.currentTarget as HTMLButtonElement).style.background =
+                'linear-gradient(135deg, rgba(74,222,128,0.16), rgba(22,163,74,0.12))';
             }
           }}
         >
-          {customFieldsOpen ? 'Analyze Search Index' : 'Run Benchmark'}
+          Launch Demo
         </button>
       </div>
 
-        <button
-          type="button"
-          onClick={handleGuidedTour}
-          aria-label="Start the guided tour"
-          disabled={isLoading}
+      <button
+        type="button"
+        onClick={handleGuidedTour}
+        disabled={isLoading}
         style={{
           width: '100%',
           padding: '10px',
@@ -649,7 +642,6 @@ export default function ConnectForm({
                 key={preset.id}
                 type="button"
                 onClick={() => handleLoadBenchmarkPreset(preset.id)}
-                aria-label={`Use the ${preset.label} benchmark preset`}
                 style={{
                   display: 'grid',
                   gridTemplateColumns: '1fr auto',
@@ -762,7 +754,6 @@ export default function ConnectForm({
         <button
           type="button"
           onClick={() => setCustomOpen(o => !o)}
-          aria-expanded={customFieldsOpen}
           style={{
             width: '100%',
             display: 'flex',
@@ -962,7 +953,6 @@ export default function ConnectForm({
                   type="file"
                   accept=".json,application/json"
                   style={{ display: 'none' }}
-                  aria-label="Upload test search JSON"
                   onChange={e => {
                     void handleEvalUpload(e.target.files?.[0] ?? null);
                     e.currentTarget.value = '';
@@ -1003,7 +993,6 @@ export default function ConnectForm({
         <button
           type="button"
           onClick={() => setAdvancedOpen(o => !o)}
-          aria-expanded={advancedOpen}
           style={{
             width: '100%',
             display: 'flex',
@@ -1149,7 +1138,6 @@ export default function ConnectForm({
       <div style={{ display: 'flex', gap: 10 }}>
         <button
           type="submit"
-          aria-label={customFieldsOpen ? 'Analyze the search index' : 'Run the benchmark'}
           disabled={isLoading}
           style={{
             flex: 1,
@@ -1194,7 +1182,6 @@ export default function ConnectForm({
         <button
           type="button"
           onClick={handleDemo}
-          aria-label="Launch the demo"
           disabled={isLoading}
           style={{
             flex: 1,
@@ -1232,7 +1219,6 @@ export default function ConnectForm({
       <button
         type="button"
         onClick={handleGuidedTour}
-        aria-label="Start the guided tour"
         disabled={isLoading}
         style={{
           width: '100%',
@@ -1280,7 +1266,11 @@ function normalizeErrorMessage(error: unknown, fallback: string): string {
     return fallback;
   }
 
-  if (error.message.includes('Cannot reach the ElastiTune backend')) {
+  if (error.message.includes('Elasticsearch is temporarily unavailable')) {
+    return 'Elasticsearch is not reachable right now. Check the cluster URL, credentials, and that the backend can connect.';
+  }
+
+  if (error.message.includes('Cannot reach the backend')) {
     return 'The ElastiTune backend is not reachable right now. Start the API server, then try again.';
   }
 

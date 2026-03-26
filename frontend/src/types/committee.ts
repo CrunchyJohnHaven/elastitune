@@ -192,6 +192,7 @@ export interface CommitteeReport {
 }
 
 export interface CommitteeExportPayload {
+  runId: string;
   documentName: string;
   exportedAt: string;
   committeeSummary: {
@@ -241,6 +242,25 @@ export interface CommitteeExportPayload {
     materials?: Record<string, unknown>;
     suggestedPrompt?: string;
   };
+}
+
+export interface CommitteeRunListItem {
+  run_id: string;
+  stage: CommitteeStage;
+  document_name: string;
+  source_type: string;
+  evaluation_mode: CommitteeEvaluationMode;
+  industry_profile_id: string;
+  industry_label: string;
+  baseline_score: number;
+  best_score: number;
+  improvement_pct: number;
+  accepted_rewrites: number;
+  rewrites_tested: number;
+  personas_count: number;
+  started_at?: string | null;
+  completed_at?: string | null;
+  updated_at?: string | null;
 }
 
 export type CommitteeRunSocketEvent =

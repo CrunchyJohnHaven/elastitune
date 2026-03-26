@@ -95,6 +95,7 @@ def build_export_payload(ctx: CommitteeRunContext) -> CommitteeExportPayload:
         )
 
     return CommitteeExportPayload(
+        runId=ctx.run_id,
         documentName=ctx.summary.documentName,
         exportedAt=datetime.now(timezone.utc).isoformat(),
         committeeSummary={

@@ -282,6 +282,18 @@ class SearchTaskRunner:
         await self.manager._persist_search_run(run_id)
         if self.manager.persistence and ctx.report:
             await self.manager.persistence.save_report(ctx.report)
+        if ctx.report:
+            from .elastic_sink_service import ElasticSinkService
+
+            sink = ElasticSinkService.from_settings()
+            if sink is not None:
+                try:
+                    await sink.index_search_run(ctx.report)
+                except Exception as exc:
+                    logger.warning("Elastic sink indexing failed for search run %s: %s", run_id, exc)
+                    ctx.warnings.append(f"Elastic sink indexing failed: {exc}")
+                finally:
+                    await sink.close()
         await self.manager.publish(
             run_id,
             {"type": "run.stage", "payload": {"runId": run_id, "stage": "completed"}},
@@ -304,6 +316,28 @@ class SearchTaskRunner:
                 return 0.0, [case.query for case in ctx.eval_set], {}
             es_svc = ESService(es_url=ctx.es_url, api_key=ctx.api_key or None)
             close_after = True
+
+        if settings.use_msearch_eval and hasattr(es_svc, "msearch_profile_queries"):
+            try:
+                ranked_results = await es_svc.msearch_profile_queries(
+                    index=ctx.index_name or ctx.summary.indexName,
+                    eval_cases=ctx.eval_set,
+                    profile=profile,
+                    size=10,
+                )
+                total_ndcg = 0.0
+                missed_queries: List[str] = []
+                per_query_scores: Dict[str, float] = {}
+                for case in ctx.eval_set:
+                    ranked_doc_ids = ranked_results.get(case.id, [])
+                    ndcg = self._compute_ndcg_at_k(case.relevantDocIds, ranked_doc_ids, k=10)
+                    per_query_scores[case.id] = ndcg
+                    total_ndcg += ndcg
+                    if ndcg == 0:
+                        missed_queries.append(case.query)
+                return total_ndcg / max(len(ctx.eval_set), 1), missed_queries, per_query_scores
+            except Exception as exc:
+                logger.warning("msearch evaluation failed, falling back to per-query scoring: %s", exc)
 
         async def evaluate_case(case: Any) -> tuple[str, float, Optional[str]]:
             if not case.relevantDocIds:
@@ -430,6 +464,8 @@ class SearchTaskRunner:
                 logger.warning("LLM suggestion failed: %s", exc)
 
         combined_history = [*ctx.prior_experiments, *ctx.experiments]
+        if ctx.optimizer_strategy == "adaptive_evolutionary":
+            return _adaptive_evolutionary_experiment(ctx.current_profile, combined_history)
         return _heuristic_next_experiment(ctx.current_profile, combined_history)
 
     async def persona_simulator_loop(self, run_id: str) -> None:
@@ -802,6 +838,142 @@ def _random_perturbation(
     if len(history) % 5 < 3:
         return _single_random_mutation(profile, reverted_signatures, rng)
     return _combo_mutation(profile, reverted_signatures, rng)
+
+
+def _adaptive_evolutionary_experiment(
+    profile: SearchProfile,
+    history: List[ExperimentRecord],
+) -> SearchProfileChange:
+    positive_history = [
+        experiment
+        for experiment in history
+        if experiment.decision == "kept" and experiment.deltaAbsolute > 0
+    ]
+    rng = random.Random(len(history) * 17 + 7)
+    if not positive_history:
+        return _heuristic_next_experiment(profile, history) or _random_perturbation(
+            profile,
+            history,
+            rng,
+        )
+
+    scored_paths: Dict[str, float] = {}
+    for experiment in positive_history:
+        scored_paths[experiment.change.path] = scored_paths.get(experiment.change.path, 0.0) + max(
+            experiment.deltaAbsolute,
+            0.001,
+        )
+
+    ordered_paths = sorted(
+        scored_paths.items(),
+        key=lambda item: item[1],
+        reverse=True,
+    )
+    reverted_signatures = {
+        (experiment.change.path, str(experiment.change.after))
+        for experiment in history
+        if experiment.decision == "reverted"
+    }
+
+    for path, _score in ordered_paths[:5]:
+        candidate = _mutate_specific_path(profile, path, rng)
+        if candidate and (candidate.path, str(candidate.after)) not in reverted_signatures:
+            return candidate
+
+    return _random_perturbation(profile, history, rng)
+
+
+def _mutate_specific_path(
+    profile: SearchProfile,
+    path: str,
+    rng: random.Random,
+) -> Optional[SearchProfileChange]:
+    if path.startswith("lexicalFields[") and path.endswith("].boost"):
+        start = path.index("[") + 1
+        end = path.index("]")
+        index = int(path[start:end])
+        if index >= len(profile.lexicalFields):
+            return None
+        current = profile.lexicalFields[index]["boost"]
+        delta = rng.choice([-1.0, -0.5, -0.25, 0.25, 0.5, 1.0])
+        new_val = round(max(0.1, min(10.0, current + delta)), 2)
+        if new_val == current:
+            return None
+        field_name = profile.lexicalFields[index].get("field", f"field_{index}")
+        return SearchProfileChange(
+            path=path,
+            before=current,
+            after=new_val,
+            label=f"{field_name} boost {current} → {new_val} (adaptive)",
+        )
+
+    if path in {"tieBreaker", "phraseBoost", "vectorWeight"}:
+        ranges = {
+            "tieBreaker": (0.0, 0.7, 2),
+            "phraseBoost": (0.0, 5.0, 1),
+            "vectorWeight": (0.1, 0.8, 2),
+        }
+        low, high, rounding = ranges[path]
+        current = getattr(profile, path, low)
+        candidate = round(rng.uniform(low, high), rounding)
+        if candidate == current:
+            return None
+        return SearchProfileChange(
+            path=path,
+            before=current,
+            after=candidate,
+            label=f"{_FIELD_LABELS.get(path, path)} {current} → {candidate} (adaptive)",
+        )
+
+    if path in {"multiMatchType", "minimumShouldMatch", "fuzziness", "fusionMethod"}:
+        discrete_values = {
+            "multiMatchType": ["best_fields", "most_fields", "cross_fields", "phrase"],
+            "minimumShouldMatch": [
+                "50%",
+                "55%",
+                "60%",
+                "65%",
+                "70%",
+                "75%",
+                "80%",
+                "85%",
+                "90%",
+                "95%",
+                "100%",
+            ],
+            "fuzziness": ["0", "AUTO"],
+            "fusionMethod": ["weighted_sum", "rrf"],
+        }
+        current = getattr(profile, path, None)
+        options = [value for value in discrete_values[path] if value != current]
+        if not options:
+            return None
+        candidate = rng.choice(options)
+        return SearchProfileChange(
+            path=path,
+            before=current,
+            after=candidate,
+            label=f"{_FIELD_LABELS.get(path, path)} {current!r} → {candidate!r} (adaptive)",
+        )
+
+    if path in {"rrfRankConstant", "knnK"}:
+        params = {
+            "rrfRankConstant": (10, 120, 10),
+            "knnK": (5, 80, 5),
+        }
+        low, high, step = params[path]
+        current = getattr(profile, path, low)
+        options = [value for value in range(low, high + 1, step) if value != current]
+        if not options:
+            return None
+        candidate = rng.choice(options)
+        return SearchProfileChange(
+            path=path,
+            before=current,
+            after=candidate,
+            label=f"{_FIELD_LABELS.get(path, path)} {current} → {candidate} (adaptive)",
+        )
+    return None
 
 
 def _single_random_mutation(

@@ -17,6 +17,17 @@ class Settings(BaseSettings):
     keep_threshold: float = 0.001
     metrics_interval_seconds: float = 2.0
     persona_batch_interval_seconds: float = 1.5
+    use_split_managers: bool = True
+    committee_persistence_enabled: bool = True
+    use_msearch_eval: bool = False
+    emit_invariant_events: bool = True
+    enable_elastic_sink: bool = False
+    elastic_sink_url: str | None = None
+    elastic_sink_api_key: str | None = None
+    elastic_sink_search_runs_prefix: str = "elastitune-search-runs"
+    elastic_sink_search_experiments_prefix: str = "elastitune-search-experiments"
+    elastic_sink_committee_runs_prefix: str = "elastitune-committee-runs"
+    max_committee_upload_bytes: int = 8 * 1024 * 1024
     host: str = "0.0.0.0"
     port: int = 8000
     cors_origins: List[str] = Field(default_factory=lambda: ["*"])

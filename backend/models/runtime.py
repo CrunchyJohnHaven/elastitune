@@ -53,6 +53,7 @@ class RunContext:
         max_experiments: int = 60,
         duration_minutes: int = 30,
         auto_stop_on_plateau: bool = True,
+        optimizer_strategy: str = "heuristic",
     ):
         self.run_id = run_id
         self.mode = connection.mode
@@ -82,6 +83,7 @@ class RunContext:
         self.max_experiments = max_experiments
         self.duration_minutes = duration_minutes
         self.auto_stop_on_plateau = auto_stop_on_plateau
+        self.optimizer_strategy = optimizer_strategy
         self.cancel_flag = asyncio.Event()
         self.tasks: List[asyncio.Task] = []
         self.report: Optional[ReportPayload] = None

@@ -5,6 +5,7 @@ import type {
   CommitteeConnectionResponse,
   CommitteeExportPayload,
   CommitteeReport,
+  CommitteeRunListItem,
   CommitteeSnapshot,
 } from '@/types/committee';
 
@@ -15,70 +16,51 @@ function friendlyStatusMessage(status: number, detail?: string): string {
   const normalizedDetail = detail?.trim();
   switch (status) {
     case 400:
-      return normalizedDetail || 'The request was rejected by the backend.';
+      return normalizedDetail || 'The request could not be understood.';
     case 401:
     case 403:
-      return 'Invalid credentials or insufficient permissions for that Elasticsearch cluster.';
+      return normalizedDetail || 'Invalid credentials or permission denied.';
     case 404:
       return normalizedDetail || 'The requested resource was not found.';
-    case 408:
-      return 'The backend took too long to respond.';
     case 409:
-      return normalizedDetail || 'The requested action cannot be completed yet.';
+      return normalizedDetail || 'That action cannot be completed right now.';
     case 422:
-      return normalizedDetail || 'One or more request fields were invalid.';
+      return normalizedDetail || 'Please check the form values and try again.';
     case 429:
-      return 'Too many requests were sent to the backend. Please try again shortly.';
+      return normalizedDetail || 'Too many requests. Please wait a moment and try again.';
     case 500:
-      return 'The backend encountered an internal error.';
     case 502:
     case 503:
-      return 'The backend is temporarily unavailable.';
+    case 504:
+      return normalizedDetail || 'The backend is temporarily unavailable.';
     default:
       return normalizedDetail || `Request failed with HTTP ${status}.`;
   }
 }
 
-async function readErrorBody(res: Response): Promise<string | undefined> {
-  const contentType = res.headers.get('content-type') ?? '';
+async function normalizeResponseError(res: Response): Promise<Error> {
+  let detail = '';
   try {
-    const text = await res.text();
-    if (contentType.includes('application/json')) {
-      const payload = JSON.parse(text) as unknown;
-      if (typeof payload === 'string') return payload;
-      if (payload && typeof payload === 'object') {
-        const data = payload as { detail?: unknown; message?: unknown; error?: unknown };
-        const value = data.detail ?? data.message ?? data.error;
-        if (typeof value === 'string') return value;
-        if (Array.isArray(value)) {
-          return value
-            .map(item => {
-              if (typeof item === 'string') return item;
-              if (item && typeof item === 'object' && 'msg' in item) {
-                return String((item as { msg?: unknown }).msg ?? '');
-              }
-              return '';
-            })
-            .filter(Boolean)
-            .join('; ');
+    const raw = await res.text();
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw) as { detail?: unknown; message?: unknown };
+        if (typeof parsed.detail === 'string') {
+          detail = parsed.detail;
+        } else if (typeof parsed.message === 'string') {
+          detail = parsed.message;
+        } else {
+          detail = raw;
         }
+      } catch {
+        detail = raw;
       }
     }
-    return text.trim() || undefined;
   } catch {
-    // Ignore unreadable error bodies.
-    return undefined;
+    detail = '';
   }
-}
 
-function normalizeNetworkError(error: unknown): Error {
-  if (error instanceof DOMException && error.name === 'AbortError') {
-    return new Error('Request timed out. Check that the backend is running and responsive.');
-  }
-  if (error instanceof TypeError) {
-    return new Error('Cannot reach the backend. Make sure the API server is running.');
-  }
-  return error instanceof Error ? error : new Error('Unknown request error');
+  return new Error(friendlyStatusMessage(res.status, detail));
 }
 
 async function request<T>(path: string, options?: RequestInit & { timeoutMs?: number }): Promise<T> {
@@ -94,13 +76,18 @@ async function request<T>(path: string, options?: RequestInit & { timeoutMs?: nu
       ...fetchOpts,
     });
   } catch (error) {
-    throw normalizeNetworkError(error);
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new Error('Request timed out. Check that the backend is running and responsive.');
+    }
+    if (error instanceof TypeError) {
+      throw new Error('Cannot reach the ElastiTune backend. Make sure the API server is running.');
+    }
+    throw error;
   } finally {
     clearTimeout(timer);
   }
   if (!res.ok) {
-    const detail = await readErrorBody(res);
-    throw new Error(friendlyStatusMessage(res.status, detail));
+    throw await normalizeResponseError(res);
   }
   return res.json();
 }
@@ -192,8 +179,7 @@ export const api = {
       body: form,
     });
     if (!res.ok) {
-      const detail = await readErrorBody(res);
-      throw new Error(friendlyStatusMessage(res.status, detail));
+      throw await normalizeResponseError(res);
     }
     return res.json() as Promise<CommitteeConnectionResponse>;
   },
@@ -203,6 +189,8 @@ export const api = {
     maxRewrites?: number;
     autoStopOnPlateau?: boolean;
     doNoHarmFloor?: number;
+    personaWeightingMode?: 'balanced' | 'authority' | 'skeptic_priority';
+    reactionMemoryWeight?: number;
     scoreThresholds?: {
       supportive?: number;
       cautiouslyInterested?: number;
@@ -221,9 +209,24 @@ export const api = {
         maxRewrites: opts?.maxRewrites ?? 36,
         autoStopOnPlateau: opts?.autoStopOnPlateau ?? true,
         doNoHarmFloor: opts?.doNoHarmFloor ?? -0.05,
+        personaWeightingMode: opts?.personaWeightingMode ?? 'authority',
+        reactionMemoryWeight: opts?.reactionMemoryWeight ?? 0.25,
         scoreThresholds: opts?.scoreThresholds,
       }),
     }),
+
+  listCommitteeRuns: (opts?: {
+    limit?: number;
+    industryProfileId?: string;
+    completedOnly?: boolean;
+  }) => {
+    const params = new URLSearchParams();
+    if (opts?.limit) params.set('limit', String(opts.limit));
+    if (opts?.industryProfileId) params.set('industryProfileId', opts.industryProfileId);
+    if (opts?.completedOnly) params.set('completedOnly', 'true');
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    return request<{ runs: CommitteeRunListItem[] }>(`/committee/runs${suffix}`);
+  },
 
   getCommitteeSnapshot: (runId: string) =>
     request<CommitteeSnapshot>(`/committee/runs/${runId}`),
@@ -246,10 +249,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ connectionId, modelIds, maxExperimentsPerModel }),
     });
-    if (!res.ok) {
-      const detail = await readErrorBody(res);
-      throw new Error(friendlyStatusMessage(res.status, detail));
-    }
+    if (!res.ok) throw await normalizeResponseError(res);
     return res.json();
   },
 };

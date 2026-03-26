@@ -93,6 +93,8 @@ export default function CommitteeScreen() {
   const [industryProfileId, setIndustryProfileId] = useState('auto');
   const [doNoHarmFloor, setDoNoHarmFloor] = useState(-0.05);
   const [autoStopOnPlateau, setAutoStopOnPlateau] = useState(true);
+  const [personaWeightingMode, setPersonaWeightingMode] = useState<'balanced' | 'authority' | 'skeptic_priority'>('authority');
+  const [reactionMemoryWeight, setReactionMemoryWeight] = useState(0.25);
   const [summary, setSummary] = useState<Awaited<ReturnType<typeof api.connectCommittee>> | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -172,6 +174,8 @@ export default function CommitteeScreen() {
         durationMinutes: 4,
         autoStopOnPlateau,
         doNoHarmFloor,
+        personaWeightingMode,
+        reactionMemoryWeight,
       });
       setRunId(response.runId);
       toast.info('Committee run starting…');
@@ -219,20 +223,31 @@ export default function CommitteeScreen() {
                   Drop in a pitch or proposal, infer the room automatically, and watch the same ElastiTune loop optimize the document for consensus.
                 </div>
               </div>
-              <Link
-                to="/"
-                onClick={() => reset()}
-                style={{
-                  color: '#4DA3FF',
-                  fontFamily: 'Inter, sans-serif',
-                  fontSize: 12,
-                  textDecoration: 'none',
-                  flexShrink: 0,
-                  marginTop: 4,
-                }}
-              >
-                ← Search Mode
-              </Link>
+              <div style={{ display: 'flex', gap: 12, flexShrink: 0, marginTop: 4 }}>
+                <Link
+                  to="/committee/history"
+                  style={{
+                    color: '#9AA4B2',
+                    fontFamily: 'Inter, sans-serif',
+                    fontSize: 12,
+                    textDecoration: 'none',
+                  }}
+                >
+                  History
+                </Link>
+                <Link
+                  to="/"
+                  onClick={() => reset()}
+                  style={{
+                    color: '#4DA3FF',
+                    fontFamily: 'Inter, sans-serif',
+                    fontSize: 12,
+                    textDecoration: 'none',
+                  }}
+                >
+                  ← Search Mode
+                </Link>
+              </div>
             </div>
 
             <div style={{ display: 'flex', gap: 20, marginBottom: 22, flexWrap: 'wrap' }}>
@@ -470,6 +485,32 @@ export default function CommitteeScreen() {
                       />
                       Stop early when the score plateaus
                     </label>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: isNarrow ? '1fr' : '1fr 1fr', gap: 12 }}>
+                    <div>
+                      <FieldLabel>Persona Weighting</FieldLabel>
+                      <select
+                        value={personaWeightingMode}
+                        onChange={(event) => setPersonaWeightingMode(event.target.value as 'balanced' | 'authority' | 'skeptic_priority')}
+                        style={selectStyle}
+                      >
+                        <option value="authority">Preserve authority weighting</option>
+                        <option value="balanced">Equal weighting</option>
+                        <option value="skeptic_priority">Bias skeptical reviewers</option>
+                      </select>
+                    </div>
+                    <div>
+                      <FieldLabel>Reaction Memory</FieldLabel>
+                      <input
+                        type="number"
+                        min={0}
+                        max={0.8}
+                        step={0.05}
+                        value={reactionMemoryWeight}
+                        onChange={(event) => setReactionMemoryWeight(Number(event.target.value))}
+                        style={inputStyle}
+                      />
+                    </div>
                   </div>
                 </div>
               </details>

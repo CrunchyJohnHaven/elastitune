@@ -9,10 +9,12 @@ import orjson
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 
+from ..config import settings
 from ..committee.document_parser import parse_document_bytes
 from ..committee.models import (
     CommitteeConnectionResponse,
     CommitteePersona,
+    CommitteeRunListItem,
     StartCommitteeRunRequest,
     StartCommitteeRunResponse,
     StopCommitteeRunResponse,
@@ -30,6 +32,29 @@ router = APIRouter(tags=["committee"])
 
 def _get_run_manager(request: Request) -> RunManager:
     return request.app.state.run_manager
+
+
+def _apply_persona_weighting(
+    personas: List[CommitteePersona],
+    weighting_mode: str,
+) -> List[CommitteePersona]:
+    if not personas:
+        return personas
+    if weighting_mode == "balanced":
+        weight = round(1.0 / len(personas), 4)
+        return [persona.model_copy(update={"authorityWeight": weight}) for persona in personas]
+    if weighting_mode == "skeptic_priority":
+        weighted = [
+            max(persona.authorityWeight, 0.05) * (1.0 + persona.skepticismLevel / 10)
+            for persona in personas
+        ]
+    else:
+        weighted = [max(persona.authorityWeight, 0.05) for persona in personas]
+    total = sum(weighted) or 1.0
+    return [
+        persona.model_copy(update={"authorityWeight": round(weight / total, 4)})
+        for persona, weight in zip(personas, weighted)
+    ]
 
 
 @router.post("/committee/connect", response_model=CommitteeConnectionResponse)
@@ -51,6 +76,13 @@ async def connect_committee(
     payload = await document.read()
     if not payload:
         raise HTTPException(status_code=422, detail="Uploaded document was empty")
+    if len(payload) > settings.max_committee_upload_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=(
+                f"Uploaded document exceeds the {settings.max_committee_upload_bytes // (1024 * 1024)} MB safety limit"
+            ),
+        )
 
     try:
         parsed_document = parse_document_bytes(filename, payload)
@@ -124,8 +156,12 @@ async def start_committee_run(
         raise HTTPException(status_code=404, detail="Committee connection not found")
 
     run_id = str(uuid.uuid4())
+    weighted_personas = _apply_persona_weighting(
+        conn_ctx.personas,
+        body.personaWeightingMode,
+    )
     persona_views = []
-    for persona in conn_ctx.personas:
+    for persona in weighted_personas:
         persona_views.append(
             {
                 "id": persona.id,
@@ -155,12 +191,38 @@ async def start_committee_run(
         duration_minutes=body.durationMinutes,
         auto_stop_on_plateau=body.autoStopOnPlateau,
         do_no_harm_floor=body.doNoHarmFloor,
+        persona_weighting_mode=body.personaWeightingMode,
+        reaction_memory_weight=body.reactionMemoryWeight,
         score_thresholds=body.scoreThresholds,
     )
+    run_ctx.persona_definitions = weighted_personas
     await run_manager.create_committee_run(run_id, run_ctx)
     await run_manager.start_committee_run_tasks(run_id)
 
     return StartCommitteeRunResponse(runId=run_id, stage="starting")
+
+
+@router.get("/committee/runs")
+async def list_committee_runs(
+    request: Request,
+    limit: int = 50,
+    industryProfileId: Optional[str] = None,
+    completedOnly: bool = False,
+) -> JSONResponse:
+    run_manager = _get_run_manager(request)
+    runs = await run_manager.list_committee_runs(
+        limit=min(limit, 200),
+        industry_profile_id=industryProfileId,
+        completed_only=completedOnly,
+    )
+    return JSONResponse(
+        content={
+            "runs": [
+                CommitteeRunListItem(**run).model_dump()
+                for run in runs
+            ]
+        }
+    )
 
 
 @router.get("/committee/runs/{run_id}")
@@ -191,9 +253,12 @@ async def get_committee_report(run_id: str, request: Request) -> JSONResponse:
     run_manager = _get_run_manager(request)
     ctx = await run_manager.get_committee_run(run_id)
     if not ctx:
-        raise HTTPException(
-            status_code=404, detail=f"Committee run '{run_id}' not found"
-        )
+        persisted = await run_manager.get_committee_report(run_id)
+        if not persisted:
+            raise HTTPException(
+                status_code=404, detail=f"Committee run '{run_id}' not found"
+            )
+        return JSONResponse(content=orjson.loads(persisted.model_dump_json()))
     if ctx.report is None:
         if ctx.stage not in ("completed", "stopping", "error"):
             raise HTTPException(status_code=409, detail="Committee run is still active")

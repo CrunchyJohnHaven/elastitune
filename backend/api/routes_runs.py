@@ -109,6 +109,7 @@ async def start_run(body: StartRunRequest, request: Request) -> StartRunResponse
         max_experiments=body.maxExperiments,
         duration_minutes=body.durationMinutes,
         auto_stop_on_plateau=body.autoStopOnPlateau,
+        optimizer_strategy=body.optimizerStrategy,
     )
     if body.previousRunId:
         run_ctx.previous_run_id = body.previousRunId

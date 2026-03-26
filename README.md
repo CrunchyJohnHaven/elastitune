@@ -1,94 +1,118 @@
 # ElastiTune
 
-ElastiTune is a live Elasticsearch tuning demo with two modes:
+ElastiTune is a dual-mode optimization demo for Elasticsearch.
 
-- `Search` mode optimizes relevance for a real index or bundled benchmark.
-- `Committee` mode simulates a buying committee that scores and rewrites proposal documents.
+- **Search mode** tunes relevance profiles against an eval set and reports nDCG lift.
+- **Committee mode** simulates a buying committee that reviews and rewrites a document until the message is stronger.
 
 **Live demo:** [elastitune.replit.app](https://elastitune.replit.app/)
 
-![Architecture diagram](doc-assets/architecture.svg)
+![screenshot placeholder](docs/screenshot.png)
+
+> *Elasticsearch is the piano. ElastiTune is the piano tuner.*
 
 ## Happy Path
 
-1. Open the connect screen.
-2. Click `Launch Demo` for the fastest walkthrough.
-3. Or choose a benchmark preset and tune a real index.
-4. Watch the run screen update in real time.
-5. Open the report and export the result.
+The shortest path through the product is:
 
-For the short version first, read the [Executive Summary](docs/executive-summary.md). For a presenter-friendly walkthrough, see [docs/demo-narrative.md](docs/demo-narrative.md).
+1. Connect to Elasticsearch or load a benchmark preset.
+2. Launch a run in search mode or committee mode.
+3. Watch the live telemetry update over WebSocket.
+4. Open the report and export the result when the run completes.
+
+For a presenter-friendly walkthrough, see [docs/demo-narrative.md](docs/demo-narrative.md).
 
 ## Quick Start
 
-Prerequisites: Python 3.11+, Node 18+, and Elasticsearch 8.x.
+**Prerequisites:** Python 3.11+, Node 18+, and a running Elasticsearch 8.x instance.
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
+# Backend
+python3 -m venv .venv && source .venv/bin/activate
 pip install -r backend/requirements.txt
-cp .env.example .env
 python3 -m uvicorn backend.main:app --reload --port 8000
+
+# Frontend in a second terminal
 cd frontend
 npm install
 npm run dev
 ```
 
-Docker Compose can start the full stack locally:
+Or start the full stack with Docker Compose:
 
 ```bash
 docker compose up --build
 ```
 
-## Docs
+## Modes
 
-- [Local development workflow](docs/CONTRIBUTING.md)
-- [Committee mode overview](docs/committee.md)
-- [Executive Summary](docs/executive-summary.md)
-- [API reference](docs/api-reference.md)
-- [Benchmark guide](BENCHMARKS.md)
-- [GitHub research notes](docs/github-research.md)
-- [Task map](CODEX_TASKS.md)
+### Search Mode
+
+- Connect to a live Elasticsearch index or one of the bundled benchmarks.
+- Evaluate a baseline profile.
+- Run controlled experiments across boosts, match strategy, fuzziness, hybrid weights, and fusion settings.
+- Keep only changes that improve score.
+
+### Committee Mode
+
+- Upload a proposal, report, or other boardroom-facing document.
+- Generate or supply personas.
+- Score the document through the committee loop.
+- Rewrite sections until the committee is more supportive.
+
+## Architecture
+
+- **Backend:** FastAPI, Pydantic v2, async Elasticsearch access, and optional SQLite-backed persistence for saved runs and reports.
+- **Frontend:** React 18, TypeScript, Vite, Zustand, Canvas, and Recharts.
+- **Realtime:** One WebSocket per run for snapshots, metrics, and completion events.
+- **Docs:** System overview in [docs/architecture.svg](docs/architecture.svg), API reference in [docs/api-reference.md](docs/api-reference.md), and committee behavior in [docs/committee.md](docs/committee.md).
+
+![Architecture overview](docs/architecture.svg)
+
+## Runs And Reports
+
+- `GET /api/runs/{runId}` returns the current search snapshot.
+- `GET /api/committee/runs/{runId}` returns the current committee snapshot.
+- `GET /api/runs/{runId}/report` and `GET /api/committee/runs/{runId}/report` return the final report payloads.
+- `GET /api/runs` lists persisted search runs when persistence is configured.
 
 ## Testing
 
 ```bash
-python3 -m pytest backend/tests/ -v
+python3 -m pytest backend/tests -q
 python3 backend/scripts/smoke_app.py
 cd frontend && npx tsc --noEmit && npm run build
 ```
 
 ## Benchmarks
 
-Five benchmark datasets are bundled. Use `python3 benchmarks/setup.py` to load them, or `--reset` to wipe and reload.
+See [docs/BENCHMARKS.md](docs/BENCHMARKS.md) for the benchmark harness, the `elastic-product-store` target, and how to add a new benchmark pack.
 
-| Benchmark | Index | Docs | Eval queries |
-|---|---|---:|---:|
-| Product Store | `products-catalog` | 931 | 8 |
-| Books Catalog | `books-catalog` | 2,000 | 12 |
-| Workplace Docs | `workplace-docs` | 15 | 16 |
-| Security SIEM | `security-siem` | 301 | 18 |
-| TMDB Movies | `tmdb-movies` | 8,516 | 12 |
+## Contributing
 
-## Architecture
+See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for local development, test commands, smoke checks, and troubleshooting.
 
-- **Backend:** FastAPI, Pydantic v2, AsyncElasticsearch, SQLite persistence, WebSocket streaming.
-- **Frontend:** React 18, TypeScript, Vite, Zustand, Canvas rendering.
-- **Run services:** `RunManager`, `ESService`, and committee modules coordinate live search and committee flows.
-- **Transport:** one WebSocket per run, with persisted reports available after completion.
+## Deploy To Replit
 
-## More Docs
-
-- [Demo narrative](docs/demo-narrative.md)
-- [API reference](docs/api-reference.md)
-- [Committee mode guide](docs/committee.md)
-- [Benchmark guide](BENCHMARKS.md)
-- [Contributor guide](docs/CONTRIBUTING.md)
-
-## Replit
-
-`replit.nix` and `.replit` are included. Import the repo into Replit, set the variables from `.env.example`, and run:
+`replit.nix` and `.replit` are included. Import the repo into Replit, set the environment variables from `.env.example` in Secrets, then run:
 
 ```bash
 bash setup.sh && bash start.sh
 ```
+
+## Related Projects
+
+| Project | What it does | Link |
+|---|---|---|
+| **AutoResearch** | An autonomous LLM training experiment that explores a small but real training loop. | [github.com/karpathy/autoresearch](https://github.com/karpathy/autoresearch) |
+| **MiroFish** | A swarm intelligence engine for multi-agent prediction tasks. | [github.com/666ghj/MiroFish](https://github.com/666ghj/MiroFish) |
+
+## Stack
+
+| Layer | Technology |
+|---|---|
+| Backend | FastAPI, Uvicorn, Pydantic v2, Elasticsearch client libraries |
+| Frontend | React 18, TypeScript, Vite, Zustand |
+| Visualization | Canvas, Recharts, framer-motion |
+| Evaluation | nDCG@10 and committee scoring |
+| Packaging | Docker Compose, Replit |

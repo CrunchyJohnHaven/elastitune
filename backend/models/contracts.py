@@ -222,6 +222,7 @@ class RunConfig(BaseModel):
     maxExperiments: int = 200
     personaCount: int = 36
     autoStopOnPlateau: bool = True
+    optimizerStrategy: Literal["heuristic", "adaptive_evolutionary"] = "heuristic"
 
 
 class RunSnapshot(BaseModel):
@@ -251,6 +252,7 @@ class StartRunRequest(BaseModel):
     maxExperiments: int = 200
     personaCount: int = 36
     autoStopOnPlateau: bool = True
+    optimizerStrategy: Literal["heuristic", "adaptive_evolutionary"] = "heuristic"
     previousRunId: Optional[str] = None  # Resume from a previous run's best profile
 
 

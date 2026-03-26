@@ -1,52 +1,102 @@
 # Committee Mode
 
-Committee mode simulates the internal buying group that often reviews a proposal, pitch deck, or solution brief.
+Committee mode turns a document into a live decision-making exercise.
 
-## What personas are
+It models a small buying committee, scores the document from each persona's point of view, and rewrites weak sections until the message is more persuasive.
 
-Personas are structured buyer roles. They have:
+## Core Idea
 
-- a title and decision role,
-- authority weight,
-- priorities and concerns,
-- likely objections,
-- and a current score while the run is active.
+The committee loop has four steps:
 
-The frontend renders them in the committee canvas, rails, and final report.
+1. Parse the uploaded document into sections.
+2. Generate personas or accept provided personas.
+3. Evaluate each section for each persona.
+4. Propose rewrites, keep the ones that improve the committee score, and publish the report.
 
-## How personas are generated
+## Persona Generation
 
-Persona generation lives in [backend/committee/personas.py](../backend/committee/personas.py).
+Personas come from `backend/committee/personas.py`.
 
-The generator follows three paths:
+There are three broad paths:
 
-- `provided_personas` from the request take precedence.
-- Seed personas can be used when the run should feel deterministic or demo-friendly.
-- Otherwise the heuristics derive personas from the parsed document, the detected industry profile, and the available LLM configuration.
+- **Provided personas**: the user uploads a custom persona list.
+- **Seed personas**: the app uses built-in role templates for a predictable demo.
+- **LLM-assisted personas**: when an LLM is configured, it can help generate a more tailored committee.
 
-When an LLM is available, the persona generator can use it for richer role descriptions. When it is not, the heuristics fall back to stable, deterministic buyer roles.
+When no LLM is available, the system falls back to deterministic heuristics so the workflow still completes.
 
-## How the committee loop works
+Useful files:
 
-The committee loop is coordinated by [backend/api/routes_committee.py](../backend/api/routes_committee.py) and [backend/services/run_manager.py](../backend/services/run_manager.py).
+- [`backend/committee/personas.py`](../backend/committee/personas.py)
+- [`backend/committee/industry_profiles.py`](../backend/committee/industry_profiles.py)
+- [`backend/committee/runtime.py`](../backend/committee/runtime.py)
 
-At a high level:
+## Evaluation And Rewrite Loop
 
-1. The uploaded document is parsed into sections by [backend/committee/document_parser.py](../backend/committee/document_parser.py).
-2. Personas are built or normalized.
-3. The evaluator scores each persona against each section.
-4. The rewrite engine proposes improvements to the weakest sections.
-5. The report and export payload summarize the strongest narrative and the remaining objections.
+The live committee run is coordinated from `backend/services/run_manager.py` and the committee evaluator/rewrite engine.
 
-The scoring and rollup logic lives in [backend/committee/evaluator.py](../backend/committee/evaluator.py). The final report and export payload are built in [backend/committee/reporting.py](../backend/committee/reporting.py).
+The flow is:
 
-## What the UI shows
+1. Parse the document.
+2. Build a baseline score.
+3. Publish a persona batch to the client.
+4. Select a section and a rewrite parameter.
+5. Evaluate the candidate version.
+6. Keep the change if it improves score and does not violate the do-no-harm floor.
 
-- `CommitteeRunScreen` streams the live consensus loop.
-- `CommitteeTopBar` shows elapsed time, consensus, and rewrite counts.
-- `CommitteeRightRail` shows the persona list, selected persona detail, and score timeline.
-- `CommitteeReportScreen` shows the final diff, persona reactions, and rewrite log.
+Relevant files:
 
-## Why this mode exists
+- [`backend/committee/evaluator.py`](../backend/committee/evaluator.py)
+- [`backend/committee/rewrite_engine.py`](../backend/committee/rewrite_engine.py)
+- [`backend/committee/reporting.py`](../backend/committee/reporting.py)
+- [`backend/api/routes_committee.py`](../backend/api/routes_committee.py)
+- [`backend/services/run_manager.py`](../backend/services/run_manager.py)
 
-Committee mode gives teams a structured way to test whether a document works for different stakeholders, not just whether it sounds polished. It is especially useful for proposal reviews, enablement briefings, and executive narratives where one weak objection can derail the whole message.
+## Scoring Model
+
+Committee scoring is intentionally simple to explain in a demo:
+
+- each persona gets a per-section score
+- the app rolls those scores into a committee view
+- the run tracks baseline, current, and best scores
+- rewrites are accepted or rejected based on the resulting committee posture
+
+The exposed evaluation modes are:
+
+- `full_committee`
+- `adversarial`
+- `champion_only`
+
+## What The UI Shows
+
+The committee UI shows:
+
+- the parsed document
+- persona cards and objections
+- the live rewrite log
+- score changes over time
+- the final report and export payload
+
+The WebSocket event stream is shared with the rest of the app, which makes the live run feel consistent with search mode.
+
+## Demo Notes
+
+Committee mode works best when the document has a clear business message:
+
+- a proposal
+- an executive brief
+- a sales deck
+- a project summary
+
+The most convincing demo path is to show:
+
+1. A skeptical persona reacting to the first draft.
+2. A rewrite that addresses the objection.
+3. The score improvement.
+4. The export or report output at the end.
+
+## Related Documentation
+
+- [docs/api-reference.md](api-reference.md)
+- [docs/demo-narrative.md](demo-narrative.md)
+- [docs/research.md](research.md)

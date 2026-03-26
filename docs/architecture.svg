@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="680" viewBox="0 0 1200 680" role="img" aria-label="ElastiTune architecture overview">
+  <defs>
+    <style>
+      .bg { fill: #0b0f14; }
+      .panel { fill: #121923; stroke: #3b4a5e; stroke-width: 2; }
+      .panel2 { fill: #10161f; stroke: #51627a; stroke-width: 2; }
+      .title { fill: #f4f7fb; font: 700 28px Arial, sans-serif; }
+      .label { fill: #d7e1f0; font: 600 18px Arial, sans-serif; }
+      .text { fill: #9fb0c7; font: 15px Arial, sans-serif; }
+      .arrow { stroke: #8fb6ff; stroke-width: 4; fill: none; marker-end: url(#arrowhead); }
+      .line { stroke: #4d6078; stroke-width: 2; }
+    </style>
+    <marker id="arrowhead" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M 0 0 L 12 6 L 0 12 z" fill="#8fb6ff" />
+    </marker>
+  </defs>
+  <rect class="bg" x="0" y="0" width="1200" height="680" />
+  <text class="title" x="50" y="54">ElastiTune Architecture Overview</text>
+
+  <rect class="panel" x="40" y="96" width="240" height="500" rx="18" ry="18" />
+  <text class="label" x="70" y="138">Frontend</text>
+  <text class="text" x="70" y="174">ConnectScreen</text>
+  <text class="text" x="70" y="204">RunScreen</text>
+  <text class="text" x="70" y="234">ReportScreen</text>
+  <text class="text" x="70" y="264">CommitteeScreen</text>
+  <text class="text" x="70" y="294">CommitteeRunScreen</text>
+  <text class="text" x="70" y="324">CommitteeReportScreen</text>
+  <text class="text" x="70" y="364">WebSocket client</text>
+  <text class="text" x="70" y="394">Run history UI</text>
+
+  <rect class="panel" x="340" y="96" width="340" height="500" rx="18" ry="18" />
+  <text class="label" x="370" y="138">Backend API</text>
+  <rect class="panel2" x="370" y="166" width="280" height="84" rx="16" ry="16" />
+  <text class="text" x="394" y="200">routes_connect.py</text>
+  <text class="text" x="394" y="228">routes_runs.py</text>
+  <rect class="panel2" x="370" y="274" width="280" height="84" rx="16" ry="16" />
+  <text class="text" x="394" y="308">routes_committee.py</text>
+  <text class="text" x="394" y="336">ws_runs.py</text>
+  <rect class="panel2" x="370" y="382" width="280" height="84" rx="16" ry="16" />
+  <text class="text" x="394" y="416">run_manager.py</text>
+  <text class="text" x="394" y="444">task_runner.py</text>
+  <rect class="panel2" x="370" y="490" width="280" height="84" rx="16" ry="16" />
+  <text class="text" x="394" y="524">persistence_service.py</text>
+  <text class="text" x="394" y="552">report_service.py</text>
+
+  <rect class="panel" x="740" y="96" width="400" height="500" rx="18" ry="18" />
+  <text class="label" x="770" y="138">Runtime And Services</text>
+  <text class="text" x="770" y="178">Search mode optimizer</text>
+  <text class="text" x="770" y="208">Committee evaluator</text>
+  <text class="text" x="770" y="238">Rewrite engine</text>
+  <text class="text" x="770" y="268">ES service</text>
+  <text class="text" x="770" y="298">LLM service</text>
+  <text class="text" x="770" y="328">Persistence to SQLite</text>
+  <text class="text" x="770" y="358">Optional report export</text>
+  <line class="line" x1="770" y1="390" x2="1110" y2="390" />
+  <text class="label" x="770" y="426">External systems</text>
+  <text class="text" x="770" y="462">Elasticsearch index</text>
+  <text class="text" x="770" y="492">Optional LLM provider</text>
+  <text class="text" x="770" y="522">Optional SQLite DB</text>
+  <text class="text" x="770" y="552">Optional benchmark data</text>
+
+  <path class="arrow" d="M 280 190 C 315 190, 320 190, 340 190" />
+  <path class="arrow" d="M 280 360 C 315 360, 320 360, 340 360" />
+  <path class="arrow" d="M 680 240 C 715 240, 720 240, 740 240" />
+  <path class="arrow" d="M 680 390 C 715 390, 720 390, 740 390" />
+  <path class="arrow" d="M 680 522 C 715 522, 720 522, 740 522" />
+  <path class="arrow" d="M 920 390 C 920 356, 920 326, 920 310" />
+  <text class="text" x="830" y="640">WebSocket pushes snapshots, metrics, and completion events to the UI.</text>
+</svg>

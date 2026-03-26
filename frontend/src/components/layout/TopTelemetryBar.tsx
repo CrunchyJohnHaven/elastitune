@@ -1,25 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAppStore } from '@/store/useAppStore';
-import { formatScore, formatPercent, formatDuration, formatDollars, truncate, getDisplayElapsedSeconds } from '@/lib/format';
 import {
-  PANEL_BORDER,
+  formatDollars,
+  formatDuration,
+  formatPercent,
+  formatScore,
+  getDisplayElapsedSeconds,
+  truncate,
+} from '@/lib/format';
+import {
   ACCENT_BLUE,
-  TEXT_SECONDARY,
-  TEXT_DIM,
-  FONT_SANS,
   FONT_MONO,
-  SURFACE_STRONG,
+  FONT_UI,
+  PANEL_BORDER,
+  TEXT_DIM,
 } from '@/lib/theme';
-
-function formatQueriesTested(evalCaseCount: number, experimentsRun: number, baselineScore: number) {
-  if (evalCaseCount <= 0) return { tested: '—', total: '—' };
-  const completedPasses = Math.max(experimentsRun + (baselineScore > 0 ? 1 : 0), 1);
-  return {
-    tested: Intl.NumberFormat('en-US').format(evalCaseCount * completedPasses),
-    total: Intl.NumberFormat('en-US').format(evalCaseCount),
-  };
-}
 
 function HowItWorksButton() {
   const showExplainer = useAppStore(state => state.showExplainer);
@@ -28,11 +24,13 @@ function HowItWorksButton() {
 
   return (
     <button
+      type="button"
       onClick={toggleExplainer}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      aria-label={showExplainer ? 'Return to the live run view' : 'Open the explainer panel'}
-      title="How does this work?"
+      title={showExplainer ? 'Hide the explainer panel' : 'Show the explainer panel'}
+      aria-pressed={showExplainer}
+      aria-label={showExplainer ? 'Hide the explainer panel' : 'Show the explainer panel'}
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -61,7 +59,7 @@ function HowItWorksButton() {
           borderRadius: '50%',
           background: showExplainer ? `${ACCENT_BLUE}30` : 'rgba(255,255,255,0.08)',
           border: `1px solid ${showExplainer ? ACCENT_BLUE : 'rgba(255,255,255,0.15)'}`,
-          fontFamily: 'Inter, sans-serif',
+          fontFamily: FONT_UI,
           fontSize: 11,
           fontWeight: 700,
           color: showExplainer ? ACCENT_BLUE : '#9AA4B2',
@@ -72,7 +70,7 @@ function HowItWorksButton() {
       </span>
       <span
         style={{
-          fontFamily: 'JetBrains Mono, monospace',
+          fontFamily: FONT_MONO,
           fontSize: 9,
           fontWeight: 600,
           letterSpacing: '0.06em',
@@ -148,7 +146,7 @@ function SocketStatusDot({ status }: { status: 'connected' | 'disconnected' | 'r
     disconnected: '#FB7185',
     dead: '#FB7185',
     idle: '#6B7480',
-  };
+  } as const;
   const color = colorMap[status];
   const isPulsing = status === 'connected' || status === 'reconnecting';
 
@@ -187,9 +185,9 @@ function SocketStatusDot({ status }: { status: 'connected' | 'disconnected' | 'r
       </div>
       <span
         style={{
-          fontFamily: 'JetBrains Mono, monospace',
+          fontFamily: FONT_MONO,
           fontSize: 9,
-          color: color,
+          color,
           textTransform: 'uppercase',
           letterSpacing: '0.08em',
         }}
@@ -198,6 +196,12 @@ function SocketStatusDot({ status }: { status: 'connected' | 'disconnected' | 'r
       </span>
     </div>
   );
+}
+
+function formatQueriesTested(evalCaseCount: number, totalRuns: number) {
+  if (evalCaseCount <= 0) return '—';
+  const cumulative = evalCaseCount * Math.max(totalRuns, 1);
+  return `${Intl.NumberFormat('en-US').format(cumulative)}/${Intl.NumberFormat('en-US').format(evalCaseCount)}`;
 }
 
 export default function TopTelemetryBar() {
@@ -209,12 +213,11 @@ export default function TopTelemetryBar() {
   const startedAt = useAppStore(state => state.runSnapshot?.startedAt);
   const completedAt = useAppStore(state => state.runSnapshot?.completedAt);
   const socketStatus = useAppStore(state => state.socketStatus);
-  const [, forceUpdate] = useState(0);
+  const [, setTick] = useState(0);
 
-  // Update elapsed time display every second
   useEffect(() => {
-    const timer = setInterval(() => forceUpdate(n => n + 1), 1000);
-    return () => clearInterval(timer);
+    const timer = window.setInterval(() => setTick(value => value + 1), 1000);
+    return () => window.clearInterval(timer);
   }, []);
 
   const ndcgValue = metrics ? formatScore(metrics.currentScore) : '—';
@@ -224,44 +227,25 @@ export default function TopTelemetryBar() {
   const totalRun = metrics
     ? metrics.experimentsRun + (metrics.priorExperimentsRun ?? 0)
     : 0;
-  const keptRun = metrics
-    ? `${totalKept} / ${totalRun}`
-    : '— / —';
-  const winPct = metrics
-    ? `${(metrics.personaSuccessRate * 100).toFixed(0)}%`
-    : '—';
+  const keptRun = metrics ? `${totalKept}/${totalRun}` : '—/—';
+  const winPct = metrics ? `${(metrics.personaSuccessRate * 100).toFixed(0)}%` : '—';
   const savings =
     metrics?.projectedMonthlySavingsUsd != null
       ? formatDollars(metrics.projectedMonthlySavingsUsd)
       : '—';
-  const elapsedSeconds = (() => {
-    if (!metrics) return 0;
-    if (stage === 'completed' || stage === 'error' || !startedAt) {
-      return getDisplayElapsedSeconds({
-        metricsElapsedSeconds: metrics.elapsedSeconds,
-        startedAt,
-        completedAt,
-        stage,
-      });
-    }
-    const started = new Date(startedAt).getTime();
-    if (Number.isNaN(started)) {
-      return getDisplayElapsedSeconds({
-        metricsElapsedSeconds: metrics.elapsedSeconds,
-        startedAt,
-        completedAt,
-        stage,
-      });
-    }
-    return Math.max(metrics.elapsedSeconds, (Date.now() - started) / 1000);
-  })();
+  const elapsedSeconds = metrics
+    ? getDisplayElapsedSeconds({
+      metricsElapsedSeconds: metrics.elapsedSeconds,
+      startedAt,
+      completedAt,
+      stage,
+      nowMs: Date.now(),
+    })
+    : 0;
   const elapsed = metrics ? formatDuration(elapsedSeconds) : '—';
-  const queriesTested = summary && metrics
-    ? formatQueriesTested(summary.baselineEvalCount, totalRun, metrics.baselineScore)
-    : { tested: '—', total: '—' };
-  const queriesTitle = summary
-    ? `Queries tested counts all completed baseline/candidate passes. ${queriesTested.tested} total tests across ${queriesTested.total} eval cases.`
-    : 'Queries tested counts all completed baseline/candidate passes.';
+  const queriesTested = summary
+    ? formatQueriesTested(summary.baselineEvalCount, totalRun + (stage === 'completed' ? 0 : 1))
+    : '—';
   const clusterName = summary?.clusterName ? truncate(summary.clusterName, 18) : '—';
   const eta = metrics && runConfig
     ? (() => {
@@ -297,14 +281,14 @@ export default function TopTelemetryBar() {
           flexShrink: 0,
           display: 'flex',
           alignItems: 'stretch',
-          background: SURFACE_STRONG,
+          background: 'rgba(11,15,21,0.95)',
           borderBottom: `1px solid ${PANEL_BORDER}`,
           backdropFilter: 'blur(12px)',
           zIndex: 100,
           overflow: 'hidden',
+          fontFamily: FONT_UI,
         }}
       >
-        {/* Logo block — clicking navigates home */}
         <Link
           to="/"
           style={{
@@ -320,7 +304,7 @@ export default function TopTelemetryBar() {
           onMouseEnter={e => ((e.currentTarget as HTMLAnchorElement).style.opacity = '0.75')}
           onMouseLeave={e => ((e.currentTarget as HTMLAnchorElement).style.opacity = '1')}
           title="Back to Dashboard"
-          aria-label="Back to dashboard"
+          aria-label="Back to Dashboard"
         >
           <div
             style={{
@@ -333,7 +317,7 @@ export default function TopTelemetryBar() {
           />
           <span
             style={{
-              fontFamily: FONT_SANS,
+              fontFamily: FONT_UI,
               fontWeight: 700,
               fontSize: 13,
               color: '#EEF3FF',
@@ -352,8 +336,13 @@ export default function TopTelemetryBar() {
         <TelemetryBlock label="CLUSTER" value={clusterName} />
         <TelemetryBlock
           label="QUERIES TESTED"
-          value={`${queriesTested.tested}/${queriesTested.total}`}
-          title={queriesTitle}
+          value={queriesTested}
+          title={
+            summary?.baselineEvalCount
+              ? 'Cumulative queries tested across the baseline and each experiment, shown against the size of the evaluation set.'
+              : 'No evaluation set is loaded yet.'
+          }
+          dimmed={!summary?.baselineEvalCount}
         />
         <TelemetryBlock
           label="nDCG@10"
@@ -364,13 +353,17 @@ export default function TopTelemetryBar() {
             fontSize: 18,
           }}
         />
-        <TelemetryBlock label="KEPT / RUN" value={keptRun} title="Cumulative improvements kept versus total experiments run." />
+        <TelemetryBlock label="KEPT / RUN" value={keptRun} />
         <TelemetryBlock label="PERSONA WIN%" value={winPct} />
         <TelemetryBlock
           label="GAIN"
-          value={metrics?.improvementPct != null && metrics.improvementPct !== 0
-            ? `+${metrics.improvementPct.toFixed(1)}%`
-            : savings !== '—' ? savings : '—'}
+          value={
+            metrics?.improvementPct != null && metrics.improvementPct !== 0
+              ? `${formatPercent(metrics.improvementPct)}`
+              : savings !== '—'
+              ? savings
+              : '—'
+          }
           valueStyle={
             metrics?.improvementPct != null && metrics.improvementPct > 0
               ? { color: '#4ADE80' }
@@ -380,8 +373,8 @@ export default function TopTelemetryBar() {
           }
           dimmed={(!metrics?.improvementPct || metrics.improvementPct === 0) && savings === '—'}
         />
-        <TelemetryBlock label="ELAPSED" value={elapsed} title="Elapsed time since the run started." />
-        <TelemetryBlock label="ETA" value={eta} dimmed={eta === '—'} title="Estimated time remaining for the active run." />
+        <TelemetryBlock label="ELAPSED" value={elapsed} />
+        <TelemetryBlock label="ETA" value={eta} dimmed={eta === '—'} />
 
         <div style={{ flex: 1 }} />
 

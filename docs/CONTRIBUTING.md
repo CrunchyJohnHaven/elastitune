@@ -1,8 +1,14 @@
-# Local Development Workflow
+# Contributing
 
-This project is intentionally simple to start locally:
+This repository is designed to be easy to run locally, demo in a browser, and inspect from the terminal.
 
-## 1. Backend
+## Local Setup
+
+1. Create a Python virtual environment.
+2. Install backend requirements.
+3. Start Elasticsearch.
+4. Start the backend on port `8000`.
+5. Start the frontend on port `5173`.
 
 ```bash
 python3 -m venv .venv
@@ -11,9 +17,7 @@ pip install -r backend/requirements.txt
 python3 -m uvicorn backend.main:app --reload --port 8000
 ```
 
-The backend serves the API on `http://localhost:8000` and the WebSocket transport on `/ws/runs/{runId}`.
-
-## 2. Frontend
+In another terminal:
 
 ```bash
 cd frontend
@@ -21,25 +25,56 @@ npm install
 npm run dev
 ```
 
-Vite runs on `http://localhost:5173` and proxies `/api` and `/ws` back to the backend.
-
-## 3. Tests
+If you prefer Docker:
 
 ```bash
-python3 -m pytest backend/tests/ -v
-python3 backend/scripts/smoke_app.py
-cd frontend && npx tsc --noEmit && npm run build
+docker compose up --build
 ```
 
-## 4. Reports
+## Tests
 
-- Search reports are available at `/report/:runId`.
-- Committee reports are available at `/committee/report/:runId`.
-- Export buttons in the UI generate JSON or HTML artifacts from the in-memory report objects.
+Run the backend tests first because they cover the core run orchestration and persistence logic.
 
-## 5. Troubleshooting
+```bash
+python3 -m pytest backend/tests -q
+```
 
-- Port conflict on `8000`: stop any existing FastAPI/Uvicorn process or change `PORT` in `.env`.
-- Port conflict on `5173`: stop the existing Vite dev server or change the frontend port in `frontend/vite.config.ts`.
-- Elasticsearch unavailable: make sure the sample benchmark stack or your own Elasticsearch instance is running before connecting in live mode.
-- WebSocket disconnects: refresh the run page after verifying the backend is still healthy.
+Run a smoke test against a running backend:
+
+```bash
+python3 backend/scripts/smoke_app.py
+```
+
+Type-check and build the frontend:
+
+```bash
+cd frontend
+npx tsc --noEmit
+npm run build
+```
+
+## Reports
+
+Search mode reports are available at `/api/runs/{runId}/report`.
+Committee mode reports are available at `/api/committee/runs/{runId}/report`.
+
+For manual verification, open the report screen after a run completes and confirm:
+
+1. The report data loads.
+2. The summary metrics match the live run.
+3. Export actions work without re-running the run.
+
+## Troubleshooting
+
+- Port `8000` already in use: stop the existing Python process or change the backend port in your local command.
+- Port `5173` already in use: stop the existing Vite process or launch the frontend on another port.
+- Elasticsearch connection errors: confirm `ELASTICSEARCH_URL` points to a reachable cluster and that any required API key is set.
+- Empty benchmark list: run `python3 benchmarks/setup.py` to create the bundled indices.
+- Frontend build errors: run `npx tsc --noEmit` first so TypeScript errors are easier to read.
+
+## Good Pull Requests
+
+- Keep changes focused.
+- Update docs when behavior changes.
+- Add or update tests for new behavior.
+- Preserve both search mode and committee mode unless the change is explicitly scoped to one of them.

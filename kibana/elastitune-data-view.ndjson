@@ -1,0 +1,1 @@
+{"id":"elastitune-data-view","type":"index-pattern","attributes":{"title":"elastitune-*-*","timeFieldName":"@timestamp","name":"ElastiTune Events"}}

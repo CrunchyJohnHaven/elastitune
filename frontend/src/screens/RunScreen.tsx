@@ -14,7 +14,7 @@ import FishTankCanvas from '@/components/run/FishTankCanvas';
 import RunControlBar from '@/components/run/RunControlBar';
 import WalkthroughOverlay from '@/components/walkthrough/WalkthroughOverlay';
 import ErrorBoundary from '@/components/ui/ErrorBoundary';
-import { SkeletonBlock, SkeletonCard, SkeletonPage } from '@/components/ui/Skeleton';
+import SkeletonCard from '@/components/ui/SkeletonCard';
 
 export default function RunScreen() {
   const { runId } = useParams<{ runId: string }>();
@@ -27,43 +27,6 @@ export default function RunScreen() {
 
   const stage = runSnapshot?.stage ?? 'idle';
   const showExplainer = useAppStore(state => state.showExplainer);
-
-  if (!runSnapshot) {
-    return (
-      <SkeletonPage
-        title="Loading search run"
-        subtitle="The backend is preparing the live telemetry, personas, and optimization workspace."
-      >
-        <div style={{ display: 'grid', gridTemplateColumns: '320px minmax(0, 1fr) 360px', gap: 16 }}>
-          <SkeletonCard minHeight={520}>
-            <SkeletonBlock height={14} width={120} />
-            <div style={{ marginTop: 14 }}>
-              <SkeletonBlock height={10} width="80%" />
-            </div>
-            <div style={{ marginTop: 18, display: 'grid', gap: 10 }}>
-              <SkeletonBlock height={72} />
-              <SkeletonBlock height={72} />
-              <SkeletonBlock height={72} />
-            </div>
-          </SkeletonCard>
-          <SkeletonCard minHeight={520}>
-            <SkeletonBlock height={20} width={180} />
-            <div style={{ marginTop: 18 }}>
-              <SkeletonBlock height={340} radius={18} />
-            </div>
-          </SkeletonCard>
-          <SkeletonCard minHeight={520}>
-            <SkeletonBlock height={14} width={110} />
-            <div style={{ marginTop: 16, display: 'grid', gap: 10 }}>
-              <SkeletonBlock height={84} />
-              <SkeletonBlock height={84} />
-              <SkeletonBlock height={84} />
-            </div>
-          </SkeletonCard>
-        </div>
-      </SkeletonPage>
-    );
-  }
 
   const handleStop = async () => {
     if (!runId) return;
@@ -102,9 +65,30 @@ export default function RunScreen() {
             background: '#05070B',
           }}
         >
-          <ErrorBoundary fallbackTitle="Visualization error">
-            <FishTankCanvas />
-          </ErrorBoundary>
+          {runSnapshot ? (
+            <ErrorBoundary fallbackTitle="Visualization error">
+              <FishTankCanvas />
+            </ErrorBoundary>
+          ) : (
+            <div
+              style={{
+                height: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 24,
+                background: 'radial-gradient(circle at 50% 20%, rgba(77,163,255,0.08) 0%, rgba(5,7,11,0.98) 60%)',
+              }}
+            >
+              <div style={{ width: 'min(560px, 100%)', display: 'grid', gap: 16 }}>
+                <SkeletonCard lines={2} height={120} titleWidth={220} />
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16 }}>
+                  <SkeletonCard lines={3} height={160} titleWidth={120} />
+                  <SkeletonCard lines={3} height={160} titleWidth={120} />
+                </div>
+              </div>
+            </div>
+          )}
           {runId && (
             <RunControlBar
               stage={stage}
@@ -115,7 +99,7 @@ export default function RunScreen() {
         </div>
 
         {/* Right rail or explainer */}
-        {showExplainer ? <ExplainerPanel /> : <RightRail />}
+        {showExplainer ? <ExplainerPanel /> : (runSnapshot ? <RightRail /> : <div style={{ padding: 16 }}><SkeletonCard lines={6} height={280} /></div>)}
       </div>
 
       {/* Walkthrough overlay */}

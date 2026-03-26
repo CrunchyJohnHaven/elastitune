@@ -117,14 +117,14 @@ export default function ConnectScreen() {
       {/* Left side — form panel */}
       <div
         style={{
-          width: '44%',
-          minWidth: 420,
-          maxWidth: 580,
+          width: 'min(100%, 640px)',
+          minWidth: 0,
+          maxWidth: 640,
           height: '100%',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'flex-start',
-          padding: '28px 52px 48px',
+          padding: '24px clamp(18px, 3vw, 44px) 40px',
           position: 'relative',
           zIndex: 10,
           overflowY: 'auto',
@@ -168,6 +168,36 @@ export default function ConnectScreen() {
             >
               ElastiTune
             </span>
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+              <Link
+                to="/history"
+                style={{
+                  padding: '8px 10px',
+                  borderRadius: 10,
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  color: '#9AA4B2',
+                  textDecoration: 'none',
+                  fontFamily: 'Inter, sans-serif',
+                  fontSize: 12,
+                }}
+              >
+                Search History
+              </Link>
+              <Link
+                to="/committee/history"
+                style={{
+                  padding: '8px 10px',
+                  borderRadius: 10,
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  color: '#9AA4B2',
+                  textDecoration: 'none',
+                  fontFamily: 'Inter, sans-serif',
+                  fontSize: 12,
+                }}
+              >
+                Committee History
+              </Link>
+            </div>
           </div>
 
           {/* Tagline */}
@@ -180,7 +210,7 @@ export default function ConnectScreen() {
               letterSpacing: '0.04em',
             }}
           >
-            Launch the demo, or tune a real index with a few guided fields.
+            Find weak search results, test fixes automatically, and leave with a before/after report.
           </p>
 
           <div
@@ -193,7 +223,7 @@ export default function ConnectScreen() {
               maxWidth: 520,
             }}
           >
-            ElastiTune watches how different people would search your system, tests ranking changes, and keeps only the ones that improve results.
+            ElastiTune runs realistic search tests, keeps only improvements, and packages the before/after story for you.
           </div>
 
           <div
@@ -214,7 +244,7 @@ export default function ConnectScreen() {
                 marginBottom: 5,
               }}
             >
-              Quick path
+              Start here
             </div>
             <div
               style={{
@@ -224,11 +254,11 @@ export default function ConnectScreen() {
                 lineHeight: 1.5,
               }}
             >
-              Use one of these two steps:
+              Choose the fastest path:
               <br />
-              1. Click <span style={{ color: '#EEF3FF' }}>Launch Demo</span> to see the happy path.
+              1. Click <span style={{ color: '#EEF3FF' }}>Launch Demo</span> to watch the guided demo.
               <br />
-              2. Click <span style={{ color: '#EEF3FF' }}>Use benchmark preset</span> if you want a real local benchmark with a fixed test set.
+              2. Pick a benchmark preset only if you want to test a real local index.
             </div>
             <div style={{ marginTop: 10 }}>
               <Link
@@ -277,7 +307,7 @@ export default function ConnectScreen() {
                 marginBottom: 20,
               }}
             >
-              The sample benchmark is the simplest path. Only open the custom index section if you want to test your own Elasticsearch data.
+              The sample benchmark is the simplest path. Open custom index settings only if you want to test your own Elasticsearch data.
             </div>
 
             <ConnectForm

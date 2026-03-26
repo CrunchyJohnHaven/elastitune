@@ -199,6 +199,8 @@ class StartCommitteeRunRequest(BaseModel):
     maxRewrites: int = 36
     autoStopOnPlateau: bool = True
     doNoHarmFloor: float = -0.05
+    personaWeightingMode: Literal["balanced", "authority", "skeptic_priority"] = "authority"
+    reactionMemoryWeight: float = 0.25
     scoreThresholds: Optional[CommitteeScoreThresholds] = None
 
 
@@ -261,9 +263,29 @@ class CommitteeSectionExport(BaseModel):
 
 
 class CommitteeExportPayload(BaseModel):
+    runId: str
     documentName: str
     exportedAt: str
     committeeSummary: Dict[str, Any] = {}
     sections: List[CommitteeSectionExport]
     rewriteLog: List[RewriteAttempt]
     llmHandoff: Dict[str, Any] = {}
+
+
+class CommitteeRunListItem(BaseModel):
+    run_id: str
+    stage: RunStage
+    document_name: str
+    source_type: str
+    evaluation_mode: CommitteeEvaluationMode
+    industry_profile_id: str
+    industry_label: str
+    baseline_score: float
+    best_score: float
+    improvement_pct: float
+    accepted_rewrites: int
+    rewrites_tested: int
+    personas_count: int
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    updated_at: Optional[str] = None

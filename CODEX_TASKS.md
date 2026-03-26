@@ -1,114 +1,126 @@
-# ElastiTune Task Map
+# ElastiTune Roadmap
 
 > **Last updated:** 2026-03-26
-> **Goal:** keep the backlog readable, grouped by milestone, and aligned with the current dual-mode product.
+> **Goal:** Keep the docs and backlog aligned with the current dual-mode product.
 
-## Milestone 1: Docs And Onboarding
+This roadmap mirrors the 5.4 review backlog and groups work by milestone rather than by owner.
 
-Order of operations:
+## Milestone 1: Documentation And Onboarding
 
-1. Refresh the README and keep the happy path obvious.
-2. Keep the architecture diagram, local development guide, benchmark guide, and committee guide in sync.
-3. Maintain the API reference and demo narrative.
-4. Keep environment variables and issue templates easy to discover.
+- Refresh the README and point people to the happy path.
+- Document local development and testing in `docs/CONTRIBUTING.md`.
+- Add benchmark guidance in `docs/BENCHMARKS.md`.
+- Add a committee mode explainer in `docs/committee.md`.
+- Document the API surface in `docs/api-reference.md`.
+- Publish the human demo narrative in `docs/demo-narrative.md`.
+- Keep the task list current for future reviews.
 
-Deliverables:
+## Milestone 2: Core Search And Committee Foundations
 
-- [README](README.md)
-- [Architecture diagram](doc-assets/architecture.svg)
-- [Local dev guide](docs/CONTRIBUTING.md)
-- [Benchmark guide](BENCHMARKS.md)
-- [Committee guide](docs/committee.md)
-- [API reference](docs/api-reference.md)
-- [Demo narrative](docs/demo-narrative.md)
-- [Executive Summary](docs/executive-summary.md)
-- [Issue templates](.github/ISSUE_TEMPLATE/)
+- Split `backend/services/run_manager.py` into clearer search and committee responsibilities.
+- Add persistence and history for committee runs.
+- Tighten run orchestration, concurrency, and recovery behavior.
+- Keep the search and committee contracts strongly typed and stable.
 
-## Milestone 2: Trust Rails And UX Polish
+## Milestone 3: Frontend Experience
 
-Order of operations:
+- Smooth the run telemetry and history presentation.
+- Improve loading, skeleton, and error states.
+- Tighten accessibility and theme consistency.
+- Continue extracting large components into smaller, easier-to-scan pieces.
 
-1. Keep telemetry counters and elapsed time stable.
-2. Keep the landing flow obvious and low-friction.
-3. Normalize frontend errors into friendly messages.
-4. Add loading skeletons and accessibility affordances.
-5. Keep shared theme tokens centralized.
+## Milestone 4: Integrations And Extensibility
 
-Target areas:
+- Research and prototype Kibana integration.
+- Evaluate official Elastic clients and parsing libraries.
+- Prototype a vector-search path and stronger recommendation heuristics if the product direction justifies it.
 
-- `frontend/src/components/layout/TopTelemetryBar.tsx`
-- `frontend/src/components/layout/RightRail.tsx`
-- `frontend/src/components/connect/ConnectForm.tsx`
-- `frontend/src/screens/ConnectScreen.tsx`
-- `frontend/src/lib/api.ts`
-- `frontend/src/components/ui/Skeleton.tsx`
-- `frontend/src/lib/theme.ts`
-- `frontend/src/components/walkthrough/WalkthroughOverlay.tsx`
+## Milestone 5: Long-Term Vision
 
-## Milestone 3: Committee Mode Reproducibility
+- Cross-index optimization.
+- Adaptive persona weighting.
+- Interactive persona creation.
+- Real-time collaboration.
+- Auto-tuning suggestions.
+- Elastic Cloud deployment workflow.
+- Plugin APIs for metrics, personas, and connectors.
 
-Order of operations:
+## Detailed Backlog
 
-1. Keep committee telemetry readable and monotonic.
-2. Reuse the same loading strategy on committee screens.
-3. Strengthen committee docs and report exports.
-4. Add history and persistence when the backend supports it.
+### Docs And Onboarding
 
-Target areas:
+- `DOC-1` Revise `README.md` to highlight dual mode, the happy path, and the executive summary.
+- `DOC-2` Add an architecture diagram and reference it from the docs.
+- `DOC-3` Add `docs/CONTRIBUTING.md` with local dev workflow and troubleshooting.
+- `DOC-4` Add `docs/BENCHMARKS.md` for the benchmark harness.
+- `DOC-5` Add `docs/committee.md` for personas and committee mode.
+- `DOC-6` Add `docs/api-reference.md` with actual request and response models.
+- `DOC-7` Keep this task list aligned with the next milestone set.
+- `DOC-8` Add `docs/demo-narrative.md` with a presenter-friendly script.
+- `DOC-10` Add issue templates for bugs, features, and docs improvements.
 
-- `frontend/src/components/committee/CommitteeTopBar.tsx`
-- `frontend/src/components/committee/CommitteeRightRail.tsx`
-- `frontend/src/screens/CommitteeRunScreen.tsx`
-- `frontend/src/screens/CommitteeReportScreen.tsx`
-- `backend/api/routes_committee.py`
-- `backend/committee/personas.py`
-- `backend/committee/evaluator.py`
+### Bugs And UX Polish
 
-## Milestone 4: Backend Foundations
+- `BUG-1` Keep cumulative resolved and missed counts stable in the right rail.
+- `BUG-2` Smooth elapsed time in the telemetry bar.
+- `BUG-3` Clarify query count labels and tooltips.
+- `BUG-4` Simplify the landing page and collapse advanced options.
+- `BUG-5` Normalize network and HTTP errors into friendly messages.
+- `BUG-6` Add skeletons and loading states to run and report screens.
+- `BUG-8` Improve accessibility and centralize theme tokens.
+- `BUG-9` Tighten demo mode guardrails so live indices cannot be called accidentally.
+- `BUG-10` Fix test warnings and keep the backend test suite clean.
 
-Order of operations:
+### Backend Architecture And Performance
 
-1. Keep the live demo guardrails strict.
-2. Reduce error-prone shared code in the run manager.
-3. Expand persistence and recovery once the UI needs history views.
-4. Improve tests around continuation and report generation.
+- `ARCH-1` Split the run manager by mode.
+- `ARCH-2` Clean up the old engine layer.
+- `ARCH-3` Replace the simulated compression benchmark with a real benchmark.
+- `ARCH-4` Improve the optimizer search strategy.
+- `ARCH-5` Make persona simulation more realistic.
+- `ARCH-6` Add committee run history endpoints and UI support.
+- `ARCH-7` Audit WebSocket publishing and concurrency.
+- `ARCH-8` Add fault tolerance and recovery around external calls.
+- `ARCH-9` Harden user input against injection and unsafe payloads.
+- `ARCH-10` Expand backend test coverage.
 
-Target areas:
+### Frontend Enhancements
 
-- `backend/services/demo_service.py`
-- `backend/services/run_manager.py`
-- `backend/services/persistence_service.py`
-- `backend/tests/`
+- `FE-1` Refine the top telemetry bar.
+- `FE-2` Unify styling tokens.
+- `FE-3` Consolidate shared store logic where it helps.
+- `FE-4` Add reusable skeleton components.
+- `FE-5` Improve accessibility and focus handling.
+- `FE-6` Add persistent run history pages.
+- `FE-7` Update the guided tour to match the simplified flow.
+- `FE-8` Refactor large components into smaller pieces.
+- `FE-9` Remove dead frontend code.
+- `FE-10` Improve error boundaries and retry flows.
 
-## Milestone 5: Research And Integration Bets
+### Kibana And Ecosystem
 
-Order of operations:
+- `KBN-1` Research Kibana plugin architecture.
+- `KBN-2` Prototype a Kibana plugin.
+- `KBN-3` Define the event schema for Kibana.
+- `KBN-4` Evaluate Beats and Logstash ingestion.
+- `KBN-5` Document security and authentication settings.
 
-1. Survey candidate open-source projects and libraries.
-2. Prototype the highest-value integration only after the research looks strong.
-3. Keep the rest as design notes until the backend and UX settle.
+### GitHub And Library Research
 
-Research notes:
+- `GH-1` Survey relevant open-source projects.
+- `GH-2` Evaluate Elastic clients.
+- `GH-3` Identify document parsing libraries.
+- `GH-4` Recommend UI component libraries.
 
-- [GitHub project survey](docs/research/github-projects.md)
-- [Elastic client survey](docs/research/elastic-clients.md)
-- [Document parser survey](docs/research/document-parsers.md)
-- [UI library survey](docs/research/ui-component-libraries.md)
+### Future Vision
 
-## Milestone 6: Future Expansion
-
-These are intentionally deferred until the demo path and committee path are stable:
-
-- Cross-index optimization
-- Adaptive persona weighting
-- Interactive persona creation
-- Real-time collaboration
-- Auto-tuning suggestions
-- Elastic Cloud deployment workflow
-- Plugin marketplace and extensibility
-
-## Notes
-
-- Keep new work aligned with the happy-path demo flow first.
-- Prefer small, testable changes over broad refactors unless a refactor unlocks multiple backlog items.
-- When adding new docs or UI screens, link them from the README so new contributors can find them quickly.
+- `X-1` Cross-index optimization.
+- `X-2` Adaptive persona weighting.
+- `X-3` Interactive persona creation.
+- `X-4` Real-time collaboration.
+- `X-5` Auto-tuning suggestions.
+- `X-6` Elastic Cloud deployment workflow.
+- `X-7` Enterprise security personas.
+- `X-8` AI-assisted document rewriting.
+- `X-9` Synthetic query generation improvements.
+- `X-10` Plugin marketplace and extensibility.

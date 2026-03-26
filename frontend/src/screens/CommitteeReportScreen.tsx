@@ -289,6 +289,12 @@ export default function CommitteeReportScreen() {
               ↓ Export JSON
             </button>
             <Link
+              to="/committee/history"
+              style={{ color: '#9AA4B2', textDecoration: 'none', fontFamily: 'Inter, sans-serif', fontSize: 12 }}
+            >
+              History
+            </Link>
+            <Link
               to={runId ? `/committee/run/${runId}` : '/committee'}
               aria-label="Back to committee run"
               style={{ color: '#9AA4B2', textDecoration: 'none', fontFamily: 'Inter, sans-serif', fontSize: 12 }}

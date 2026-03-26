@@ -93,24 +93,42 @@ export default function WalkthroughOverlay() {
               Step {currentStep + 1} of {WALKTHROUGH_STEPS.length}
             </div>
 
-            {/* Close button */}
-            <button
-              onClick={stopWalkthrough}
-              aria-label="Exit walkthrough"
-              style={{
-                background: 'none',
-                border: 'none',
-                color: 'rgba(154, 164, 178, 0.6)',
-                cursor: 'pointer',
-                fontSize: 16,
-                padding: '2px 6px',
-                lineHeight: 1,
-              }}
-              title="Exit walkthrough"
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button
+                onClick={stopWalkthrough}
+                style={{
+                  background: 'none',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  color: '#9AA4B2',
+                  cursor: 'pointer',
+                  fontSize: 12,
+                  padding: '6px 10px',
+                  borderRadius: 8,
+                  lineHeight: 1,
+                }}
+                title="Skip walkthrough"
+                aria-label="Skip walkthrough"
+              >
+                Skip
+              </button>
+              <button
+                onClick={stopWalkthrough}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'rgba(154, 164, 178, 0.6)',
+                  cursor: 'pointer',
+                  fontSize: 16,
+                  padding: '2px 6px',
+                  lineHeight: 1,
+                }}
+                title="Exit walkthrough"
+                aria-label="Exit walkthrough"
               >
                 ✕
               </button>
             </div>
+          </div>
 
           {/* Title */}
           <motion.h3
@@ -172,27 +190,8 @@ export default function WalkthroughOverlay() {
                 cursor: isFirst ? 'default' : 'pointer',
                 transition: 'color 0.2s',
               }}
-              >
-              Back
-            </button>
-
-            <button
-              onClick={stopWalkthrough}
-              aria-label="Skip walkthrough"
-              style={{
-                fontFamily: 'Inter, sans-serif',
-                fontSize: 13,
-                fontWeight: 500,
-                color: '#9AA4B2',
-                background: 'rgba(255, 255, 255, 0.02)',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                borderRadius: 8,
-                padding: '8px 14px',
-                cursor: 'pointer',
-                transition: 'color 0.2s, background 0.2s',
-              }}
             >
-              Skip Tour
+              Back
             </button>
 
             <div

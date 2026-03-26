@@ -10,6 +10,8 @@ const CompareScreen = lazy(() => import('./screens/CompareScreen'))
 const BenchmarkDashboard = lazy(() => import('./screens/BenchmarkDashboard'))
 const CommitteeRunScreen = lazy(() => import('./screens/CommitteeRunScreen'))
 const CommitteeReportScreen = lazy(() => import('./screens/CommitteeReportScreen'))
+const HistoryScreen = lazy(() => import('./screens/HistoryScreen'))
+const CommitteeHistoryScreen = lazy(() => import('./screens/CommitteeHistoryScreen'))
 
 function RouteFallback() {
   return (
@@ -48,10 +50,12 @@ export default function AppRoutes() {
       <Route path="/committee" element={<Guarded><CommitteeScreen /></Guarded>} />
       <Route path="/run/:runId" element={<Guarded><RunScreen /></Guarded>} />
       <Route path="/report/:runId" element={<Guarded><ReportScreen /></Guarded>} />
+      <Route path="/history" element={<Guarded><HistoryScreen /></Guarded>} />
       <Route path="/compare/:runId1/:runId2" element={<Guarded><CompareScreen /></Guarded>} />
       <Route path="/benchmarks" element={<Guarded><BenchmarkDashboard /></Guarded>} />
       <Route path="/committee/run/:runId" element={<Guarded><CommitteeRunScreen /></Guarded>} />
       <Route path="/committee/report/:runId" element={<Guarded><CommitteeReportScreen /></Guarded>} />
+      <Route path="/committee/history" element={<Guarded><CommitteeHistoryScreen /></Guarded>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
