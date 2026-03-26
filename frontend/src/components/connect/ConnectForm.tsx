@@ -343,7 +343,15 @@ export default function ConnectForm({
       // For custom index: show summary card so user can review before starting
       onConnected(resp.connectionId, resp.summary, isBenchmarkAutoRun, matchedPreviousRun);
     } catch (err) {
-      setError(normalizeErrorMessage(err, 'Could not analyze this search index.'));
+      const msg = normalizeErrorMessage(err, 'Could not analyze this search index.');
+      // If Elasticsearch isn't running and user clicked "Run Benchmark",
+      // silently fall back to demo mode so they still see the app working.
+      if (isBenchmarkAutoRun && msg.includes('Elasticsearch is not responding')) {
+        setIsLoading(false);
+        await handleDemo();
+      } else {
+        setError(msg);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -429,6 +437,126 @@ export default function ConnectForm({
 
   return (
     <form onSubmit={handleAnalyze} noValidate>
+      {/* Primary CTA buttons — shown at the top for immediate visibility */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
+        <button
+          type="submit"
+          disabled={isLoading}
+          style={{
+            flex: 1,
+            padding: '12px',
+            background: isLoading
+              ? 'rgba(77,163,255,0.35)'
+              : 'linear-gradient(135deg, #4DA3FF 0%, #3A8FFF 100%)',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 8,
+            fontFamily: 'Inter, sans-serif',
+            fontWeight: 600,
+            fontSize: 13,
+            cursor: isLoading ? 'not-allowed' : 'pointer',
+            boxShadow: isLoading ? 'none' : '0 0 20px rgba(77,163,255,0.35)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 7,
+            transition: 'box-shadow 0.2s, transform 0.1s',
+            opacity: isLoading ? 0.7 : 1,
+          }}
+          onMouseEnter={e => {
+            if (!isLoading) {
+              (e.currentTarget as HTMLButtonElement).style.boxShadow =
+                '0 0 32px rgba(77,163,255,0.55)';
+              (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-1px)';
+            }
+          }}
+          onMouseLeave={e => {
+            if (!isLoading) {
+              (e.currentTarget as HTMLButtonElement).style.boxShadow =
+                '0 0 20px rgba(77,163,255,0.35)';
+              (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(0)';
+            }
+          }}
+        >
+          {isLoading && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />}
+          {customFieldsOpen ? 'Analyze Search Index' : 'Run Benchmark'}
+        </button>
+
+        <button
+          type="button"
+          onClick={handleDemo}
+          disabled={isLoading}
+          style={{
+            flex: 1,
+            padding: '12px',
+            background: 'transparent',
+            color: '#9AA4B2',
+            border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: 8,
+            fontFamily: 'Inter, sans-serif',
+            fontWeight: 500,
+            fontSize: 13,
+            cursor: isLoading ? 'not-allowed' : 'pointer',
+            transition: 'color 0.15s, border-color 0.15s, background 0.15s',
+            opacity: isLoading ? 0.5 : 1,
+          }}
+          onMouseEnter={e => {
+            if (!isLoading) {
+              (e.currentTarget as HTMLButtonElement).style.color = '#EEF3FF';
+              (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.2)';
+              (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.04)';
+            }
+          }}
+          onMouseLeave={e => {
+            if (!isLoading) {
+              (e.currentTarget as HTMLButtonElement).style.color = '#9AA4B2';
+              (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.1)';
+              (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
+            }
+          }}
+        >
+          Launch Demo
+        </button>
+      </div>
+
+      <button
+        type="button"
+        onClick={handleGuidedTour}
+        disabled={isLoading}
+        style={{
+          width: '100%',
+          padding: '10px',
+          marginBottom: 16,
+          background: 'linear-gradient(135deg, rgba(77,163,255,0.08), rgba(124,231,255,0.06))',
+          color: '#7CE7FF',
+          border: '1px solid rgba(124,231,255,0.2)',
+          borderRadius: 8,
+          fontFamily: 'Inter, sans-serif',
+          fontWeight: 500,
+          fontSize: 12,
+          cursor: isLoading ? 'not-allowed' : 'pointer',
+          transition: 'all 0.15s',
+          opacity: isLoading ? 0.5 : 1,
+          letterSpacing: '0.02em',
+        }}
+        onMouseEnter={e => {
+          if (!isLoading) {
+            (e.currentTarget as HTMLButtonElement).style.background =
+              'linear-gradient(135deg, rgba(77,163,255,0.15), rgba(124,231,255,0.1))';
+            (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(124,231,255,0.35)';
+          }
+        }}
+        onMouseLeave={e => {
+          if (!isLoading) {
+            (e.currentTarget as HTMLButtonElement).style.background =
+              'linear-gradient(135deg, rgba(77,163,255,0.08), rgba(124,231,255,0.06))';
+            (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(124,231,255,0.2)';
+          }
+        }}
+      >
+        Guided Tour — 10 steps, plain English
+      </button>
+
       <div
         style={{
           marginBottom: 16,
@@ -505,23 +633,6 @@ export default function ConnectForm({
             gap: 6,
           }}
         >
-          {benchmarkReachable === false && (
-            <div
-              style={{
-                marginBottom: 4,
-                padding: '8px 10px',
-                borderRadius: 8,
-                border: '1px solid rgba(251,113,133,0.18)',
-                background: 'rgba(251,113,133,0.06)',
-                fontFamily: 'Inter, sans-serif',
-                fontSize: 11,
-                color: '#FCA5A5',
-                lineHeight: 1.45,
-              }}
-            >
-              Local Elasticsearch is not reachable at {benchmarkUrl}. Start Elasticsearch first, then these benchmark presets will become runnable.
-            </div>
-          )}
           {BENCHMARK_PRESETS.map(preset => {
             const isSelected = selectedPreset === preset.id || (!selectedPreset && indexName === preset.indexName && benchmarkLoaded);
             const health = benchmarkHealth[preset.indexName];
@@ -1105,7 +1216,6 @@ export default function ConnectForm({
         </button>
       </div>
 
-      {/* Guided Tour button */}
       <button
         type="button"
         onClick={handleGuidedTour}
