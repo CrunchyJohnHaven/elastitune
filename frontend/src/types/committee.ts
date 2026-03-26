@@ -157,19 +157,20 @@ export interface CommitteeNarrativeSection {
 }
 
 export interface CommitteePersonaSummary {
-  personaCount: number;
-  archetypeCounts: Record<string, number>;
-  topRoles: string[];
+  supportiveCount: number;
+  cautiousCount: number;
+  skepticalCount: number;
+  topSupporter?: string | null;
+  topBlocker?: string | null;
   explanation: string;
 }
 
 export interface CommitteeChangeNarrative {
-  sectionId?: number | null;
-  sectionTitle?: string | null;
+  experimentId: number;
+  sectionId: number;
+  sectionTitle: string;
   title: string;
   plainEnglish: string;
-  before: string;
-  after: string;
   expectedEffect: string;
   whyItHelped: string;
   confidence?: number | null;
@@ -195,7 +196,6 @@ export interface CommitteeCodeSnippet {
 export interface CommitteeImplementationGuide {
   summary: string;
   applyInstructions: string[];
-  representativeSection?: string | null;
   note?: string | null;
   snippets: CommitteeCodeSnippet[];
 }
@@ -204,7 +204,6 @@ export interface CommitteeValidationNote {
   title: string;
   body: string;
   severity: 'success' | 'info' | 'warning';
-  confidence?: number | null;
 }
 
 export interface CommitteeConnectionResponse {
@@ -238,22 +237,29 @@ export interface CommitteeReport {
   generatedAt: string;
   summary: {
     headline: string;
+    overview: string;
+    nextSteps: string[];
     baselineScore: number;
     bestScore: number;
     improvementPct: number;
     rewritesTested: number;
     acceptedRewrites: number;
-    personaCount?: number | null;
-    confidenceScore?: number | null;
+    durationSeconds: number;
+    personasCount: number;
+    confidenceScore: number;
+    sectionsChanged: number;
+    aiEvaluations: number;
+    heuristicEvaluations: number;
+    llmCoveragePct: number;
   };
   document: CommitteeDocument;
   personas: CommitteePersonaView[];
   rewrites: RewriteAttempt[];
-  narrative?: CommitteeNarrativeSection[];
+  narrative: CommitteeNarrativeSection[];
   personaSummary?: CommitteePersonaSummary | null;
-  changeNarratives?: CommitteeChangeNarrative[];
+  changeNarratives: CommitteeChangeNarrative[];
   implementationGuide?: CommitteeImplementationGuide | null;
-  validationNotes?: CommitteeValidationNote[];
+  validationNotes: CommitteeValidationNote[];
   evaluationMode: CommitteeEvaluationMode;
   warnings: string[];
 }

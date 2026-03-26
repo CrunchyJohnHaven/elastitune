@@ -19,7 +19,7 @@ from ..committee.models import (
     RewriteAttempt,
     ScoreTimelinePoint,
 )
-from ..committee.reporting import build_export_payload, build_report
+from ..committee.reporting import build_export_payload, build_report_async
 from ..committee.rewrite_engine import BASE_PARAMETER_VALUES, CommitteeRewriteEngine
 from ..committee.runtime import CommitteeConnectionContext, CommitteeRunContext
 from ..config import settings
@@ -503,7 +503,7 @@ class CommitteeRunManager:
 
         ctx.stage = "completed"
         ctx.completed_at = now_ts()
-        ctx.report = build_report(ctx)
+        ctx.report = await build_report_async(ctx)
         export_payload = build_export_payload(ctx)
         await self._persist_run(run_id)
         from .elastic_sink_service import ElasticSinkService

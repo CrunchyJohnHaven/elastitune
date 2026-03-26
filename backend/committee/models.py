@@ -236,11 +236,79 @@ class CommitteeSnapshot(BaseModel):
 
 class CommitteeReportSummary(BaseModel):
     headline: str
+    overview: str = ""
+    nextSteps: List[str] = []
     baselineScore: float
     bestScore: float
     improvementPct: float
     rewritesTested: int
     acceptedRewrites: int
+    durationSeconds: float = 0.0
+    confidenceScore: float = 0.0
+    personasCount: int = 0
+    sectionsChanged: int = 0
+    aiEvaluations: int = 0
+    heuristicEvaluations: int = 0
+    llmCoveragePct: float = 0.0
+
+
+class CommitteeNarrativeSection(BaseModel):
+    key: str
+    title: str
+    body: str
+    audience: Literal["executive", "operator", "technical"] = "executive"
+    source: Literal["deterministic", "llm"] = "deterministic"
+    confidence: float = 0.0
+
+
+class CommitteePersonaSummary(BaseModel):
+    supportiveCount: int = 0
+    cautiousCount: int = 0
+    skepticalCount: int = 0
+    topSupporter: Optional[str] = None
+    topBlocker: Optional[str] = None
+    explanation: str
+
+
+class CommitteeChangeNarrative(BaseModel):
+    experimentId: int
+    sectionId: int
+    sectionTitle: str
+    title: str
+    plainEnglish: str
+    expectedEffect: str
+    whyItHelped: str
+    confidence: float = 0.0
+    evidence: List[str] = []
+
+
+class CommitteeSnippetLine(BaseModel):
+    lineNumber: int
+    content: str
+    changed: bool = False
+    explanation: Optional[str] = None
+
+
+class CommitteeRewriteSnippet(BaseModel):
+    title: str
+    target: str
+    format: str = "text"
+    summary: str
+    beforeLines: List[CommitteeSnippetLine] = []
+    afterLines: List[CommitteeSnippetLine] = []
+
+
+class CommitteeImplementationGuide(BaseModel):
+    summary: str
+    applyInstructions: List[str] = []
+    note: Optional[str] = None
+    snippets: List[CommitteeRewriteSnippet] = []
+
+
+class CommitteeValidationNote(BaseModel):
+    title: str
+    body: str
+    severity: Literal["success", "info", "warning"] = "info"
 
 
 class CommitteeReport(BaseModel):
@@ -251,6 +319,11 @@ class CommitteeReport(BaseModel):
     document: CommitteeDocument
     personas: List[CommitteePersonaView]
     rewrites: List[RewriteAttempt]
+    narrative: List[CommitteeNarrativeSection] = []
+    personaSummary: Optional[CommitteePersonaSummary] = None
+    changeNarratives: List[CommitteeChangeNarrative] = []
+    implementationGuide: Optional[CommitteeImplementationGuide] = None
+    validationNotes: List[CommitteeValidationNote] = []
     evaluationMode: CommitteeEvaluationMode
     warnings: List[str] = []
 

@@ -262,9 +262,9 @@ async def get_committee_report(run_id: str, request: Request) -> JSONResponse:
     if ctx.report is None:
         if ctx.stage not in ("completed", "stopping", "error"):
             raise HTTPException(status_code=409, detail="Committee run is still active")
-        from ..committee.reporting import build_report
+        from ..committee.reporting import build_report_async
 
-        ctx.report = build_report(ctx)
+        ctx.report = await build_report_async(ctx)
 
     return JSONResponse(content=orjson.loads(ctx.report.model_dump_json()))
 

@@ -49,10 +49,18 @@ function buildLineDiff(before: string, after: string) {
     before: beforeLines.map((line, index) => ({
       ...line,
       changed: index >= start && index <= beforeEnd,
+      explanation:
+        index >= start && index <= beforeEnd
+          ? 'This line was replaced or removed in the accepted rewrite.'
+          : undefined,
     })),
     after: afterLines.map((line, index) => ({
       ...line,
       changed: index >= start && index <= afterEnd,
+      explanation:
+        index >= start && index <= afterEnd
+          ? 'This line appears in the accepted rewrite.'
+          : undefined,
     })),
   };
 }
@@ -102,7 +110,9 @@ function SnippetBlock({
         >
           {tone === 'before' ? 'Before' : 'After'}
         </div>
-        <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, color: '#9AA4B2' }}>
+        <div
+          style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, color: '#9AA4B2' }}
+        >
           {summary}
         </div>
       </div>
@@ -118,7 +128,7 @@ function SnippetBlock({
         }}
       >
         {lines.length > 0 ? (
-          lines.map(line => (
+          lines.map((line) => (
             <div
               key={`${tone}-${line.lineNumber}-${line.content}`}
               style={{
@@ -146,11 +156,30 @@ function SnippetBlock({
                 }}
               >
                 {line.content || ' '}
+                {line.explanation && (
+                  <div
+                    style={{
+                      marginTop: 4,
+                      fontFamily: 'Inter, sans-serif',
+                      fontSize: 10,
+                      lineHeight: 1.45,
+                      color: '#9AA4B2',
+                    }}
+                  >
+                    {line.explanation}
+                  </div>
+                )}
               </div>
             </div>
           ))
         ) : (
-          <div style={{ color: '#6B7480', fontFamily: 'Inter, sans-serif', fontSize: 11 }}>
+          <div
+            style={{
+              color: '#6B7480',
+              fontFamily: 'Inter, sans-serif',
+              fontSize: 11,
+            }}
+          >
             No snippet lines were supplied.
           </div>
         )}
@@ -167,7 +196,7 @@ export default function CommitteeImplementationGuide({
   const snippets: CommitteeCodeSnippet[] =
     guide?.snippets && guide.snippets.length > 0
       ? guide.snippets
-      : sections.map(section => {
+      : sections.map((section) => {
           const diff = buildLineDiff(section.originalContent, section.optimizedContent);
           return {
             title: section.title,
@@ -183,8 +212,8 @@ export default function CommitteeImplementationGuide({
 
   const highlightMap = new Map(
     actionableFeedback
-      .filter(item => typeof item.sectionId === 'number')
-      .map(item => [item.sectionId as number, item]),
+      .filter((item) => typeof item.sectionId === 'number')
+      .map((item) => [item.sectionId as number, item]),
   );
 
   const orderedSnippets = snippets
@@ -269,27 +298,13 @@ export default function CommitteeImplementationGuide({
         </div>
       )}
 
-      {guide?.representativeSection && (
-        <div
-          style={{
-            marginBottom: 14,
-            fontFamily: 'Inter, sans-serif',
-            fontSize: 12,
-            lineHeight: 1.6,
-            color: '#9AA4B2',
-          }}
-        >
-          Representative section: <span style={{ color: '#EEF3FF' }}>{guide.representativeSection}</span>
-        </div>
-      )}
-
       <div style={{ display: 'grid', gap: 14 }}>
-        {orderedSnippets.map(snippet => (
+        {orderedSnippets.map((snippet) => (
           <div
             key={`${snippet.target}-${snippet.title}`}
             style={{
               padding: '16px 18px',
-              borderRadius: 14,
+              borderRadius: 12,
               border: `1px solid ${PANEL_BORDER}`,
               background: 'rgba(255,255,255,0.025)',
             }}
@@ -348,8 +363,16 @@ export default function CommitteeImplementationGuide({
                 gap: 12,
               }}
             >
-              <SnippetBlock lines={snippet.beforeLines} summary={snippet.summary} tone="before" />
-              <SnippetBlock lines={snippet.afterLines} summary={snippet.summary} tone="after" />
+              <SnippetBlock
+                lines={snippet.beforeLines}
+                summary={snippet.summary}
+                tone="before"
+              />
+              <SnippetBlock
+                lines={snippet.afterLines}
+                summary={snippet.summary}
+                tone="after"
+              />
             </div>
           </div>
         ))}
