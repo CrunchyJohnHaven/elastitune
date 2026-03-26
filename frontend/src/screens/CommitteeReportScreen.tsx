@@ -282,14 +282,15 @@ export default function CommitteeReportScreen() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-            <button onClick={handleCopyExport} style={actionButtonStyle('neutral')}>
+            <button onClick={handleCopyExport} aria-label="Copy committee export JSON" style={actionButtonStyle('neutral')}>
               {copyState === 'copied' ? 'Copied JSON' : copyState === 'failed' ? 'Copy Failed' : 'Copy JSON'}
             </button>
-            <button onClick={handleDownloadExport} style={actionButtonStyle('accent')}>
+            <button onClick={handleDownloadExport} aria-label="Download committee export JSON" style={actionButtonStyle('accent')}>
               ↓ Export JSON
             </button>
             <Link
               to={runId ? `/committee/run/${runId}` : '/committee'}
+              aria-label="Back to committee run"
               style={{ color: '#9AA4B2', textDecoration: 'none', fontFamily: 'Inter, sans-serif', fontSize: 12 }}
             >
               ← Back to Run
