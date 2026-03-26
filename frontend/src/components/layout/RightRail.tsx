@@ -84,10 +84,13 @@ export default function RightRail() {
   const summary = useAppStore(state => state.runSnapshot?.summary);
   const metrics = useAppStore(state => state.runSnapshot?.metrics);
   const mode = useAppStore(state => state.runSnapshot?.mode ?? 'demo');
+  const stage = useAppStore(state => state.runSnapshot?.stage ?? 'idle');
   const searchProfile = useAppStore(state => state.runSnapshot?.searchProfile);
   const recommendedProfile = useAppStore(state => state.runSnapshot?.recommendedProfile);
   const personas = useAppStore(state => state.runSnapshot?.personas) ?? EMPTY_PERSONAS;
   const compression = useAppStore(state => state.runSnapshot?.compression);
+  const startedAt = useAppStore(state => state.runSnapshot?.startedAt);
+  const completedAt = useAppStore(state => state.runSnapshot?.completedAt);
   const selectedPersonaId = useAppStore(state => state.selectedPersonaId);
   const personaActivityById = useAppStore(state => state.personaActivityById);
   const setSelectedPersona = useAppStore(state => state.setSelectedPersona);
@@ -140,6 +143,9 @@ export default function RightRail() {
           metrics={metrics}
           mode={mode}
           profile={recommendedProfile ?? searchProfile}
+          stage={stage}
+          startedAt={startedAt}
+          completedAt={completedAt}
         />
       </div>
 
