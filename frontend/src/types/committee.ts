@@ -11,6 +11,15 @@ export type CommitteeStage =
 export type CommitteeDecision = 'kept' | 'reverted';
 export type CommitteeEvaluationMode = 'full_committee' | 'adversarial' | 'champion_only';
 export type CommitteeEvaluationSource = 'llm' | 'heuristic' | 'mixed';
+export interface CommitteeScoreThresholds {
+  supportive: number;
+  cautiouslyInterested: number;
+  neutral: number;
+  skeptical: number;
+  positiveEmotion: number;
+  enthusiasticQuote: number;
+  cautiousQuote: number;
+}
 export type CommitteeSentiment =
   | 'supportive'
   | 'cautiously_interested'
@@ -185,7 +194,27 @@ export interface CommitteeReport {
 export interface CommitteeExportPayload {
   documentName: string;
   exportedAt: string;
-  committeeSummary: Record<string, unknown>;
+  committeeSummary: {
+    evaluationMode?: CommitteeEvaluationMode;
+    industryProfileId?: string;
+    industryLabel?: string;
+    baselineScore?: number;
+    bestScore?: number;
+    improvementPct?: number;
+    acceptedRewrites?: number;
+    rewritesTested?: number;
+    aiEvaluations?: number;
+    heuristicEvaluations?: number;
+    llmCoveragePct?: number;
+    personas?: Array<{
+      name: string;
+      title: string;
+      authorityWeight: number;
+      currentScore: number;
+      topObjection?: string | null;
+      evaluationSource?: CommitteeEvaluationSource;
+    }>;
+  };
   sections: Array<{
     sectionId: number;
     title: string;
@@ -193,7 +222,25 @@ export interface CommitteeExportPayload {
     optimizedContent: string;
   }>;
   rewriteLog: RewriteAttempt[];
-  llmHandoff: Record<string, unknown>;
+  llmHandoff: {
+    task?: string;
+    documentName?: string;
+    industryProfile?: {
+      id: string;
+      label: string;
+    };
+    evaluationCoverage?: {
+      aiEvaluations: number;
+      heuristicEvaluations: number;
+      llmCoveragePct: number;
+    };
+    targetAudience?: Array<Record<string, unknown>>;
+    documentSummary?: Record<string, unknown>;
+    rewriteGoals?: string[];
+    actionableSectionFeedback?: Array<Record<string, unknown>>;
+    materials?: Record<string, unknown>;
+    suggestedPrompt?: string;
+  };
 }
 
 export type CommitteeRunSocketEvent =

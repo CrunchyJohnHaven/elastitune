@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
-import type { ConnectionSummary } from '@/types/contracts';
+import type { ConnectionSummary, SearchRunListItem } from '@/types/contracts';
 import { formatDocCount } from '@/lib/format';
 import { PANEL_BORDER, ACCENT_BLUE } from '@/lib/theme';
 
@@ -9,11 +9,13 @@ interface RunLaunchOptions {
   maxExperiments: number;
   personaCount: number;
   autoStopOnPlateau: boolean;
+  previousRunId?: string;
 }
 
 interface ClusterSummaryCardProps {
   summary: ConnectionSummary;
   connectionId: string;
+  previousRun?: SearchRunListItem | null;
   onStartOptimization: (connectionId: string, options: RunLaunchOptions) => void;
   isLoading?: boolean;
 }
@@ -63,12 +65,13 @@ function FieldChip({ label }: { label: string }) {
 export default function ClusterSummaryCard({
   summary,
   connectionId,
+  previousRun,
   onStartOptimization,
   isLoading,
 }: ClusterSummaryCardProps) {
   const domain = DOMAIN_CONFIG[summary.detectedDomain] ?? DOMAIN_CONFIG.general;
   const [durationMinutes, setDurationMinutes] = useState(30);
-  const [maxExperiments, setMaxExperiments] = useState(60);
+  const [maxExperiments, setMaxExperiments] = useState(200);
   const [personaCount, setPersonaCount] = useState(36);
   const [autoStopOnPlateau, setAutoStopOnPlateau] = useState(true);
   const [tuneOpen, setTuneOpen] = useState(false);
@@ -218,6 +221,41 @@ export default function ClusterSummaryCard({
         </div>
       )}
 
+      {previousRun && (
+        <div
+          style={{
+            marginBottom: 14,
+            padding: '10px 12px',
+            borderRadius: 8,
+            border: '1px solid rgba(74,222,128,0.16)',
+            background: 'rgba(74,222,128,0.05)',
+          }}
+        >
+          <div
+            style={{
+              fontFamily: 'Inter, sans-serif',
+              fontSize: 12,
+              fontWeight: 600,
+              color: '#EEF3FF',
+              marginBottom: 3,
+            }}
+          >
+            Continue from saved progress
+          </div>
+          <div
+            style={{
+              fontFamily: 'Inter, sans-serif',
+              fontSize: 11,
+              color: '#9AA4B2',
+              lineHeight: 1.45,
+            }}
+          >
+            A previous run improved this index from {previousRun.baseline_score.toFixed(3)} to {previousRun.best_score.toFixed(3)}.
+            This new run will start from that stronger profile instead of from scratch.
+          </div>
+        </div>
+      )}
+
       {/* Text fields */}
       {summary.primaryTextFields.length > 0 && (
         <div style={{ marginBottom: 10 }}>
@@ -338,7 +376,7 @@ export default function ClusterSummaryCard({
                   hint: 'Total run time limit',
                   value: String(durationMinutes),
                   onChange: setDurationMinutes,
-                  options: [10, 20, 30, 45],
+                  options: [5, 10, 20, 30, 60, 120],
                   suffix: 'm',
                   defaultVal: 30,
                 },
@@ -347,9 +385,9 @@ export default function ClusterSummaryCard({
                   hint: 'More = more thorough',
                   value: String(maxExperiments),
                   onChange: setMaxExperiments,
-                  options: [20, 40, 60, 80],
+                  options: [50, 100, 200, 400, 800],
                   suffix: '',
-                  defaultVal: 60,
+                  defaultVal: 200,
                 },
                 {
                   label: 'Personas',
@@ -440,6 +478,7 @@ export default function ClusterSummaryCard({
             maxExperiments,
             personaCount,
             autoStopOnPlateau,
+            previousRunId: previousRun?.run_id,
           })
         }
         disabled={isLoading}
@@ -475,7 +514,7 @@ export default function ClusterSummaryCard({
           }
         }}
       >
-        {isLoading ? 'Starting…' : 'Start Optimization →'}
+        {isLoading ? 'Starting…' : previousRun ? 'Continue from Previous Best →' : 'Start Optimization →'}
       </button>
     </div>
   );

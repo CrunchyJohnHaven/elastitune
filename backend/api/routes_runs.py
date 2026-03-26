@@ -48,6 +48,29 @@ async def start_run(body: StartRunRequest, request: Request) -> StartRunResponse
 
     run_id = str(uuid.uuid4())
 
+    # If continuing from a previous run, load its best profile as the new baseline
+    previous_best_profile = None
+    previous_experiments = []
+    if body.previousRunId:
+        prev_ctx = await run_manager.get_run(body.previousRunId)
+        if prev_ctx and prev_ctx.best_profile:
+            previous_best_profile = prev_ctx.best_profile.model_copy(deep=True)
+            previous_experiments = list(prev_ctx.experiments)
+            logger.info(
+                "Continuing from run %s — using its best profile as baseline",
+                body.previousRunId,
+            )
+        else:
+            # Try loading from persisted report
+            prev_report = await run_manager.get_report(body.previousRunId)
+            if prev_report and prev_report.searchProfileAfter:
+                previous_best_profile = prev_report.searchProfileAfter.model_copy(deep=True)
+                previous_experiments = list(prev_report.experiments)
+                logger.info(
+                    "Continuing from persisted run %s — using its recommended profile",
+                    body.previousRunId,
+                )
+
     # Build personas
     personas: List[PersonaViewModel] = await _build_personas(
         persona_count=body.personaCount,
@@ -58,6 +81,10 @@ async def start_run(body: StartRunRequest, request: Request) -> StartRunResponse
         llm_config=conn_ctx.llm_config,
     )
 
+    # Override baseline profile if continuing from a previous run
+    if previous_best_profile:
+        conn_ctx.baseline_profile = previous_best_profile
+
     run_ctx = RunContext(
         run_id=run_id,
         connection=conn_ctx,
@@ -66,6 +93,9 @@ async def start_run(body: StartRunRequest, request: Request) -> StartRunResponse
         duration_minutes=body.durationMinutes,
         auto_stop_on_plateau=body.autoStopOnPlateau,
     )
+    if body.previousRunId:
+        run_ctx.previous_run_id = body.previousRunId
+        run_ctx.prior_experiments = previous_experiments
 
     # Pre-set compression as available if the cluster has a vector field
     if conn_ctx.summary.vectorField:
@@ -91,10 +121,19 @@ async def get_run(run_id: str, request: Request) -> RunSnapshot:
 
 
 @router.get("/runs")
-async def list_runs(request: Request, limit: int = 50) -> JSONResponse:
+async def list_runs(
+    request: Request,
+    limit: int = 50,
+    indexName: Optional[str] = None,
+    completedOnly: bool = False,
+) -> JSONResponse:
     """List persisted search runs for report/history views."""
     run_manager: RunManager = _get_run_manager(request)
-    runs = await run_manager.list_search_runs(limit=limit)
+    runs = await run_manager.list_search_runs(
+        limit=limit,
+        index_name=indexName,
+        completed_only=completedOnly,
+    )
     return JSONResponse(content={"runs": runs})
 
 
@@ -147,6 +186,80 @@ async def get_report(run_id: str, request: Request) -> JSONResponse:
     return JSONResponse(
         content=orjson.loads(ctx.report.model_dump_json()),
         media_type="application/json",
+    )
+
+
+@router.get("/runs/{run_id}/preview-query")
+async def preview_query(run_id: str, queryId: str, request: Request) -> JSONResponse:
+    """Return before/after result previews and ready-to-paste query DSL for one eval query."""
+    run_manager: RunManager = _get_run_manager(request)
+
+    ctx = await run_manager.get_run(run_id)
+    report = await run_manager.get_report(run_id)
+    if ctx is None and report is None:
+        raise HTTPException(status_code=404, detail=f"Run '{run_id}' not found")
+
+    if report is None and ctx and ctx.report:
+        report = ctx.report
+
+    if report is None:
+        raise HTTPException(status_code=404, detail=f"Report for run '{run_id}' not found")
+
+    query_row = next((row for row in report.queryBreakdown if row.queryId == queryId), None)
+    if query_row is None:
+        raise HTTPException(status_code=404, detail=f"Query '{queryId}' not found in report")
+
+    baseline_results = [item.model_dump() for item in query_row.baselineTopResults]
+    optimized_results = [item.model_dump() for item in query_row.bestTopResults]
+    baseline_query = None
+    optimized_query = None
+
+    connection_config = report.connectionConfig
+    if connection_config and connection_config.indexName and connection_config.esUrl:
+        try:
+            from ..services.es_service import ESService
+
+            es_svc = ESService(
+                es_url=connection_config.esUrl,
+                api_key=connection_config.apiKey or None,
+            )
+            try:
+                baseline_query = es_svc.build_query_body(
+                    query_row.query,
+                    report.searchProfileBefore,
+                    size=5,
+                )
+                optimized_query = es_svc.build_query_body(
+                    query_row.query,
+                    report.searchProfileAfter,
+                    size=5,
+                )
+                baseline_results = await es_svc.execute_profile_query_with_hits(
+                    index=connection_config.indexName,
+                    query_text=query_row.query,
+                    profile=report.searchProfileBefore,
+                    size=5,
+                )
+                optimized_results = await es_svc.execute_profile_query_with_hits(
+                    index=connection_config.indexName,
+                    query_text=query_row.query,
+                    profile=report.searchProfileAfter,
+                    size=5,
+                )
+            finally:
+                await es_svc.close()
+        except Exception as exc:
+            logger.warning("Preview query fallback for run %s query %s: %s", run_id, queryId, exc)
+
+    return JSONResponse(
+        content={
+            "queryId": query_row.queryId,
+            "query": query_row.query,
+            "baselineResults": baseline_results,
+            "optimizedResults": optimized_results,
+            "baselineQueryDsl": baseline_query,
+            "optimizedQueryDsl": optimized_query,
+        }
     )
 
 

@@ -263,6 +263,46 @@ class ESService:
             hits = resp.get("hits", {}).get("hits", [])
         return [h["_id"] for h in hits]
 
+    async def execute_profile_query_with_hits(
+        self,
+        index: str,
+        query_text: str,
+        profile: Any,
+        size: int = 5,
+    ) -> List[Dict[str, Any]]:
+        from ..models.contracts import SearchProfile
+
+        if isinstance(profile, dict):
+            p = SearchProfile(**profile)
+        else:
+            p = profile
+
+        body = self._build_query_body(query_text, p, size)
+        resp = await self.search(index, body)
+        hits = resp.get("hits", {}).get("hits", [])
+        if not hits and p.useVector:
+            fallback_profile = p.model_copy(deep=True)
+            fallback_profile.useVector = False
+            fallback_profile.vectorWeight = 0.0
+            fallback_body = self._build_query_body(query_text, fallback_profile, size)
+            resp = await self.search(index, fallback_body)
+            hits = resp.get("hits", {}).get("hits", [])
+        return [self._format_hit_preview(hit) for hit in hits[:size]]
+
+    def build_query_body(
+        self,
+        query_text: str,
+        profile: Any,
+        size: int = 20,
+    ) -> Dict[str, Any]:
+        from ..models.contracts import SearchProfile
+
+        if isinstance(profile, dict):
+            p = SearchProfile(**profile)
+        else:
+            p = profile
+        return self._build_query_body(query_text, p, size)
+
     def _build_query_body(self, query_text: str, p: Any, size: int = 20) -> Dict[str, Any]:
         """Build Elasticsearch query body from a SearchProfile."""
         fields = [
@@ -323,3 +363,28 @@ class ESService:
             body = {"size": size, "query": lexical_query}
 
         return body
+
+    def _format_hit_preview(self, hit: Dict[str, Any]) -> Dict[str, Any]:
+        source = hit.get("_source", {}) if isinstance(hit.get("_source"), dict) else {}
+        title = (
+            source.get("title")
+            or source.get("name")
+            or source.get("book_title")
+            or source.get("summary")
+            or source.get("description")
+            or source.get("content")
+            or hit.get("_id")
+            or "Untitled result"
+        )
+        excerpt = (
+            source.get("description")
+            or source.get("summary")
+            or source.get("content")
+            or ""
+        )
+        return {
+            "docId": str(hit.get("_id", "")),
+            "title": str(title)[:140],
+            "excerpt": str(excerpt)[:240],
+            "score": float(hit.get("_score") or 0.0),
+        }

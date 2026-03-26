@@ -5,7 +5,7 @@ import asyncio
 from backend.committee.document_parser import parse_document_bytes
 from backend.committee.evaluator import CommitteeEvaluator
 from backend.committee.industry_profiles import get_industry_profile
-from backend.committee.models import CommitteePersonaView
+from backend.committee.models import CommitteePersona, CommitteePersonaView
 from backend.committee.personas import build_committee_personas
 
 
@@ -43,6 +43,59 @@ def test_enterprise_document_uses_enterprise_profile_not_sba() -> None:
     titles = [persona.title for persona in result.personas]
     assert "Chief Information Officer / CTO" in titles
     assert "General Counsel" not in titles
+
+
+def test_seeded_personas_force_sba_committee() -> None:
+    document = parse_document_bytes(
+        "csc.txt",
+        b"Elastic Cloud migration, observability modernization, and platform operations case study.",
+    )
+
+    result = asyncio.run(
+        build_committee_personas(
+            document=document,
+            committee_description="",
+            provided_personas=None,
+            use_seed_personas=True,
+            llm_service=None,
+        )
+    )
+
+    assert result.profile.id == "government"
+    assert result.personas[0].name == "Hartley Caldwell"
+
+
+def test_custom_persona_weights_are_normalized() -> None:
+    document = parse_document_bytes("test.txt", b"Generic enterprise proposal")
+    result = asyncio.run(
+        build_committee_personas(
+            document=document,
+            committee_description="",
+            provided_personas=[
+                CommitteePersona(
+                    id="1",
+                    name="One",
+                    title="Leader",
+                    organization="Buyer",
+                    roleInDecision="lead",
+                    authorityWeight=3,
+                ),
+                CommitteePersona(
+                    id="2",
+                    name="Two",
+                    title="Reviewer",
+                    organization="Buyer",
+                    roleInDecision="reviewer",
+                    authorityWeight=1,
+                ),
+            ],
+            use_seed_personas=False,
+            llm_service=None,
+        )
+    )
+
+    assert round(sum(persona.authorityWeight for persona in result.personas), 4) == 1.0
+    assert result.warnings
 
 
 def test_evaluation_modes_are_real() -> None:

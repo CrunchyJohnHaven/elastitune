@@ -6,6 +6,7 @@ import uuid
 from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import JSONResponse
 
 from ..models.contracts import (
     ConnectRequest,
@@ -25,8 +26,80 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["connect"])
 
 
+_BENCHMARK_CONFIGS = {
+    "products-catalog": {
+        "id": "products",
+        "label": "Product Store",
+        "expected_doc_count": 931,
+        "setup_command": "python benchmarks/setup.py --only products-catalog",
+    },
+    "books-catalog": {
+        "id": "books",
+        "label": "Books Catalog",
+        "expected_doc_count": 2000,
+        "setup_command": "python benchmarks/setup.py --only books-catalog",
+    },
+    "workplace-docs": {
+        "id": "workplace",
+        "label": "Workplace Docs",
+        "expected_doc_count": 15,
+        "setup_command": "python benchmarks/setup.py --only workplace-docs",
+    },
+    "security-siem": {
+        "id": "security",
+        "label": "Security SIEM",
+        "expected_doc_count": 301,
+        "setup_command": "python benchmarks/setup.py --only security-siem",
+    },
+    "tmdb": {
+        "id": "tmdb",
+        "label": "TMDB Movies",
+        "expected_doc_count": 8516,
+        "setup_command": "python benchmarks/setup.py --only tmdb",
+    },
+}
+
+
 def _get_run_manager(request: Request) -> RunManager:
     return request.app.state.run_manager
+
+
+@router.get("/connect/benchmarks")
+async def benchmark_health(request: Request, esUrl: str = "http://127.0.0.1:9200") -> JSONResponse:
+    from ..services.es_service import ESService
+
+    es_svc = ESService(es_url=esUrl)
+    reachable = False
+    presets = []
+
+    try:
+        reachable = await es_svc.ping()
+        for index_name, config in _BENCHMARK_CONFIGS.items():
+            ready = False
+            doc_count = 0
+            try:
+                await es_svc.get_mapping(index_name)
+                doc_count = await es_svc.count_docs(index_name)
+                ready = doc_count >= config["expected_doc_count"]
+            except Exception:
+                ready = False
+
+            presets.append(
+                {
+                    "id": config["id"],
+                    "label": config["label"],
+                    "indexName": index_name,
+                    "expectedDocCount": config["expected_doc_count"],
+                    "docCount": doc_count,
+                    "ready": ready,
+                    "setupCommand": config["setup_command"],
+                    "reachable": reachable,
+                }
+            )
+    finally:
+        await es_svc.close()
+
+    return JSONResponse(content={"reachable": reachable, "presets": presets})
 
 
 @router.post("/connect", response_model=ConnectResponse)
@@ -64,6 +137,7 @@ async def connect(body: ConnectRequest, request: Request) -> ConnectResponse:
 
     from ..services.es_service import ESService
     from ..services.llm_service import LLMService
+    from ..services.profile_recommender import ProfileRecommender
 
     es_svc = ESService(es_url=body.esUrl, api_key=body.apiKey or None)
 
@@ -92,6 +166,15 @@ async def connect(body: ConnectRequest, request: Request) -> ConnectResponse:
             max_sample_docs=body.maxSampleDocs,
         )
     except ValueError as exc:
+        benchmark = _BENCHMARK_CONFIGS.get(body.indexName)
+        if benchmark:
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    f"The {body.indexName} index hasn't been created yet. "
+                    f"Run: {benchmark['setup_command']}"
+                ),
+            )
         raise HTTPException(status_code=404, detail=str(exc))
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Index analysis failed: {exc}")
@@ -106,6 +189,12 @@ async def connect(body: ConnectRequest, request: Request) -> ConnectResponse:
         warnings.append("No text fields detected in index mapping. Search quality may be limited.")
 
     doc_count = await es_svc.count_docs(body.indexName)
+    benchmark = _BENCHMARK_CONFIGS.get(body.indexName)
+    if benchmark and doc_count < benchmark["expected_doc_count"]:
+        warnings.append(
+            f"{body.indexName} currently has {doc_count} docs; the benchmark target is {benchmark['expected_doc_count']}. "
+            f"If results look unstable, rerun: {benchmark['setup_command']}"
+        )
 
     # Build SampleDoc list
     sample_docs: List[SampleDoc] = []
@@ -169,13 +258,6 @@ async def connect(body: ConnectRequest, request: Request) -> ConnectResponse:
             # Heuristic eval set from sample docs
             eval_set = _build_heuristic_eval_set(raw_docs, text_fields, domain)
 
-    # Build baseline SearchProfile
-    profile_dict = await es_svc.build_baseline_profile(
-        text_fields=text_fields,
-        vector_field=vector_field,
-    )
-    baseline_profile = SearchProfile(**profile_dict)
-
     summary = ConnectionSummary(
         clusterName=cluster_name,
         clusterVersion=cluster_version,
@@ -189,6 +271,16 @@ async def connect(body: ConnectRequest, request: Request) -> ConnectResponse:
         baselineEvalCount=len(eval_set),
         baselineReady=len(eval_set) > 0,
     )
+
+    # Build baseline SearchProfile
+    profile_dict = await es_svc.build_baseline_profile(
+        text_fields=text_fields,
+        vector_field=vector_field,
+    )
+    baseline_profile = SearchProfile(**profile_dict)
+    baseline_profile, benchmark_hint = ProfileRecommender().recommend(summary, baseline_profile)
+    if benchmark_hint:
+        warnings.append(f"Seeded the starting profile using the {benchmark_hint} benchmark pattern.")
 
     ctx = ConnectionContext(
         connection_id=connection_id,
@@ -214,6 +306,72 @@ async def connect(body: ConnectRequest, request: Request) -> ConnectResponse:
         summary=summary,
         warnings=warnings,
     )
+
+
+@router.post("/probe")
+async def probe_index(body: ConnectRequest, request: Request) -> JSONResponse:
+    """
+    Generate adversarial audit queries and report which obvious intents still fail.
+    """
+    if not body.esUrl or not body.indexName:
+        raise HTTPException(status_code=422, detail="esUrl and indexName are required")
+
+    from ..services.es_service import ESService
+
+    es_svc = ESService(es_url=body.esUrl, api_key=body.apiKey or None)
+    try:
+        analysis = await es_svc.analyze_index(
+            index=body.indexName,
+            vector_field_override=body.vectorFieldOverride,
+            max_sample_docs=min(body.maxSampleDocs, 30),
+        )
+        profile = SearchProfile(
+            **await es_svc.build_baseline_profile(
+                text_fields=analysis["text_fields"],
+                vector_field=analysis["vector_field"],
+            )
+        )
+
+        failures = []
+        for idx, doc in enumerate(analysis["sample_docs"][:12], start=1):
+            title = str(doc.get("title") or doc.get("name") or doc.get("summary") or doc.get("_id", ""))
+            query_terms = [part for part in re.split(r"[^a-zA-Z0-9]+", title.lower()) if len(part) > 3][:4]
+            if not query_terms:
+                continue
+            query = " ".join(query_terms)
+            ranked_doc_ids = await es_svc.execute_profile_query(
+                index=body.indexName,
+                query_text=query,
+                profile=profile,
+                size=10,
+            )
+            found_rank = None
+            for rank, doc_id in enumerate(ranked_doc_ids, start=1):
+                if doc_id == str(doc.get("_id")):
+                    found_rank = rank
+                    break
+
+            if found_rank is None or found_rank > 5:
+                failures.append(
+                    {
+                        "id": f"probe_{idx:03d}",
+                        "query": query,
+                        "expectedDocId": str(doc.get("_id")),
+                        "expectedTitle": title[:140],
+                        "foundRank": found_rank,
+                        "issue": "Expected document did not surface near the top results.",
+                    }
+                )
+
+        return JSONResponse(
+            content={
+                "indexName": body.indexName,
+                "generatedQueries": len(analysis["sample_docs"][:12]),
+                "failures": failures,
+            }
+        )
+    finally:
+        await es_svc.close()
 
 
 # ---------------------------------------------------------------------------

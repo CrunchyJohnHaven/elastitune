@@ -311,7 +311,23 @@ class LLMService:
         old_value: str,
         new_value: str,
         industry_label: str = "General Enterprise",
+        parameter_options: Optional[Dict[str, List[str]]] = None,
     ) -> Optional[str]:
+        parameter_lines = [
+            "- stat_framing: conservative adds caveats; moderate is balanced; aggressive leads with the biggest number",
+            "- proof_point_density: low = 1 proof point; medium = 2; high = 3+",
+            "- cta_urgency: soft, firm, direct",
+            "- objection_preemption: none, light, heavy",
+            "- technical_depth: executive, practitioner, mixed",
+            "- risk_narrative: opportunity, threat, balanced",
+        ]
+        if parameter_options:
+            social_values = ", ".join(parameter_options.get("social_proof_type", []))
+            specificity_values = ", ".join(parameter_options.get("specificity", []))
+            if social_values:
+                parameter_lines.append(f"- social_proof_type: {social_values}")
+            if specificity_values:
+                parameter_lines.append(f"- specificity: {specificity_values}")
         system_prompt = (
             f"You are a professional document editor optimizing a vendor pitch for a {industry_label} buying committee. "
             "Maintain the core argument and factual substance while changing framing, tone, specificity, or proof density."
@@ -321,14 +337,8 @@ class LLMService:
             f"Current section content:\n---\n{section.content}\n---\n\n"
             f"Optimization instruction: change {parameter_name} from {old_value} to {new_value}.\n\n"
             "Parameter definitions:\n"
-            "- stat_framing: conservative adds caveats; moderate is balanced; aggressive leads with the biggest number\n"
-            "- proof_point_density: low = 1 proof point; medium = 2; high = 3+\n"
-            "- cta_urgency: soft, firm, direct\n"
-            "- objection_preemption: none, light, heavy\n"
-            "- technical_depth: executive, practitioner, mixed\n"
-            "- risk_narrative: opportunity, threat, balanced\n"
-            "- social_proof_type: internal, external, federal\n"
-            "- specificity: general, agency_tailored, hyper_specific\n\n"
+            + "\n".join(parameter_lines)
+            + "\n\n"
             "Return only the rewritten section text."
         )
         text = await self.complete(system_prompt, user_prompt)

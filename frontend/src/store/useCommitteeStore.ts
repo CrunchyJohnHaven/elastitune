@@ -37,7 +37,13 @@ export const useCommitteeStore = create<CommitteeState>((set) => ({
   socketStatus: 'idle',
   latestRewrite: null,
   setConnectionId: (connectionId) => set({ connectionId }),
-  setRunId: (runId) => set({ runId }),
+  setRunId: (runId) => set({
+    runId,
+    snapshot: null,
+    report: null,
+    latestRewrite: null,
+    socketStatus: 'idle',
+  }),
   loadSnapshot: (snapshot) => set({
     snapshot,
     latestRewrite: snapshot.rewrites[snapshot.rewrites.length - 1] ?? null,

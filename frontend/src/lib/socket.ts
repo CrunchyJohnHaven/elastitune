@@ -13,6 +13,7 @@ export class RunSocket<TEvent = RunSocketEvent> {
   private retryCount = 0;
   private maxRetries = 10;
   private destroyed = false;
+  private completed = false;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(runId: string, pathPrefix = '/ws/runs') {
@@ -37,6 +38,14 @@ export class RunSocket<TEvent = RunSocketEvent> {
     this.ws.onmessage = (e) => {
       try {
         const event = JSON.parse(e.data) as TEvent;
+        if (
+          typeof event === 'object' &&
+          event !== null &&
+          'type' in event &&
+          (event as { type?: string }).type === 'run.complete'
+        ) {
+          this.completed = true;
+        }
         this.handlers.forEach(h => h(event));
       } catch (error) {
         console.error('RunSocket failed to parse message', error);
@@ -44,7 +53,7 @@ export class RunSocket<TEvent = RunSocketEvent> {
     };
 
     this.ws.onclose = () => {
-      if (this.destroyed) return;
+      if (this.destroyed || this.completed) return;
       this.notifyStatus('disconnected');
       this.scheduleReconnect();
     };

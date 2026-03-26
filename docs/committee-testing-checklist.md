@@ -24,7 +24,13 @@ Use this for the first human QA pass of the new committee workflow.
    - document summary
    - section list
    - persona list
-6. Start the committee run directly from the setup screen
+   - detected industry
+   - visible warnings if compatibility parsing was used
+6. Open `Advanced Settings` only if needed and confirm:
+   - evaluation mode can be changed
+   - industry profile can be overridden
+   - do-no-harm floor can be edited
+7. Start the committee run directly from the setup screen
 
 ## Live Run Checks
 
@@ -44,15 +50,18 @@ Use this for the first human QA pass of the new committee workflow.
    - persona list
    - persona detail with objections and section scores
 5. Confirm the run completes and the report button appears
+6. Confirm toast notifications appear for reconnects, new best scores, completion, and stop actions
+7. Confirm stopping the run opens a confirmation dialog instead of stopping immediately
 
 ## Report Checks
 
 1. Open the committee report
 2. Confirm summary metrics look reasonable
-3. Confirm optimized sections are shown
+3. Confirm optimized sections are shown with before/after diff highlighting
 4. Confirm persona outcomes render
 5. Confirm rewrite log is populated
-6. Click `Download Export JSON`
+6. Click `Copy JSON`
+7. Click `Download Export JSON`
 
 ## Regression Checks
 

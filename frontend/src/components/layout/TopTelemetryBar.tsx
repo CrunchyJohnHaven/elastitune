@@ -187,6 +187,7 @@ function SocketStatusDot({ status }: { status: 'connected' | 'disconnected' | 'r
 export default function TopTelemetryBar() {
   const metrics = useAppStore(state => state.runSnapshot?.metrics);
   const summary = useAppStore(state => state.runSnapshot?.summary);
+  const runConfig = useAppStore(state => state.runSnapshot?.runConfig);
   const mode = useAppStore(state => state.runSnapshot?.mode ?? 'demo');
   const stage = useAppStore(state => state.runSnapshot?.stage ?? 'idle');
   const startedAt = useAppStore(state => state.runSnapshot?.startedAt);
@@ -211,20 +212,36 @@ export default function TopTelemetryBar() {
     metrics?.projectedMonthlySavingsUsd != null
       ? formatDollars(metrics.projectedMonthlySavingsUsd)
       : '—';
-  const elapsed = metrics
-    ? formatDuration(
-        getDisplayElapsedSeconds({
-          metricsElapsedSeconds: metrics.elapsedSeconds,
-          startedAt,
-          completedAt,
-          stage,
-        })
-      )
-    : '—';
+  const elapsedSeconds = metrics
+    ? getDisplayElapsedSeconds({
+      metricsElapsedSeconds: metrics.elapsedSeconds,
+      startedAt,
+      completedAt,
+      stage,
+    })
+    : 0;
+  const elapsed = metrics ? formatDuration(elapsedSeconds) : '—';
   const queriesTested = summary && metrics
     ? formatQueriesTested(summary.baselineEvalCount, metrics.experimentsRun, metrics.baselineScore)
     : '—';
   const clusterName = summary?.clusterName ? truncate(summary.clusterName, 18) : '—';
+  const eta = metrics && runConfig
+    ? (() => {
+      if (stage === 'completed') return '0s';
+      const remainingDuration = Math.max((runConfig.durationMinutes * 60) - elapsedSeconds, 0);
+      const avgExperimentSeconds = metrics.experimentsRun > 0
+        ? elapsedSeconds / metrics.experimentsRun
+        : 0;
+      const remainingExperiments = Math.max(runConfig.maxExperiments - metrics.experimentsRun, 0);
+      const experimentEstimate = avgExperimentSeconds > 0
+        ? avgExperimentSeconds * remainingExperiments
+        : remainingDuration;
+      const bounded = remainingDuration > 0 && experimentEstimate > 0
+        ? Math.min(remainingDuration, experimentEstimate)
+        : Math.max(remainingDuration, experimentEstimate);
+      return formatDuration(bounded);
+    })()
+    : '—';
 
   return (
     <>
@@ -309,6 +326,7 @@ export default function TopTelemetryBar() {
           dimmed={savings === '—'}
         />
         <TelemetryBlock label="ELAPSED" value={elapsed} />
+        <TelemetryBlock label="ETA" value={eta} dimmed={eta === '—'} />
 
         <div style={{ flex: 1 }} />
 

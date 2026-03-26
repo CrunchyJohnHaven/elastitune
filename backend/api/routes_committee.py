@@ -38,6 +38,7 @@ async def connect_committee(
     evaluationMode: str = Form("full_committee"),
     useSeedPersonas: bool = Form(True),
     committeeDescription: Optional[str] = Form(None),
+    industryProfileId: Optional[str] = Form(None),
     personasJson: Optional[str] = Form(None),
     llmJson: Optional[str] = Form(None),
 ) -> CommitteeConnectionResponse:
@@ -77,6 +78,7 @@ async def connect_committee(
         provided_personas=provided_personas,
         use_seed_personas=useSeedPersonas,
         llm_service=llm_service,
+        industry_profile_id=industryProfileId,
     )
     personas = persona_build.personas
     warnings.extend(persona_build.warnings)
@@ -144,6 +146,7 @@ async def start_committee_run(
         duration_minutes=body.durationMinutes,
         auto_stop_on_plateau=body.autoStopOnPlateau,
         do_no_harm_floor=body.doNoHarmFloor,
+        score_thresholds=body.scoreThresholds,
     )
     await run_manager.create_committee_run(run_id, run_ctx)
     await run_manager.start_committee_run_tasks(run_id)

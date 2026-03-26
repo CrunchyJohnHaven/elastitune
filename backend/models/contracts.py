@@ -172,6 +172,13 @@ class HeroMetrics(BaseModel):
     scoreTimeline: List[Dict[str, float]] = []
 
 
+class RunConfig(BaseModel):
+    durationMinutes: int = 30
+    maxExperiments: int = 200
+    personaCount: int = 36
+    autoStopOnPlateau: bool = True
+
+
 class RunSnapshot(BaseModel):
     runId: str
     productMode: ProductMode = 'search'
@@ -185,6 +192,7 @@ class RunSnapshot(BaseModel):
     experiments: List[ExperimentRecord] = []
     compression: CompressionSummary
     warnings: List[str] = []
+    runConfig: RunConfig = Field(default_factory=RunConfig)
     startedAt: Optional[str] = None
     completedAt: Optional[str] = None
 
@@ -192,9 +200,10 @@ class RunSnapshot(BaseModel):
 class StartRunRequest(BaseModel):
     connectionId: str
     durationMinutes: int = 30
-    maxExperiments: int = 60
+    maxExperiments: int = 200
     personaCount: int = 36
     autoStopOnPlateau: bool = True
+    previousRunId: Optional[str] = None  # Resume from a previous run's best profile
 
 
 class StartRunResponse(BaseModel):

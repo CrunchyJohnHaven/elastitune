@@ -29,15 +29,28 @@ frontend/dist/
 
 # Benchmarks (cloned repos)
 .benchmarks/
+benchmarks/tmdb-movies/chunk_*
+benchmarks/tmdb-movies/tmdb_es.json
+benchmarks/tmdb-movies/tmdb_es.json.zip
+benchmarks/tmdb-movies/tmdb_dump_2020-12-29.json
+benchmarks/tmdb-movies/tmdb_movies_bulk.json
 
 # Temp files
 tmp/
 *.tmp
+overnight_scores.json
+overnight_scores_v1.json
+overnight_best_profiles.json
+overnight_timeline.json
+overnight_run.log
 
 # SQLite databases
 *.db
 *.db-journal
 *.db-wal
+
+# App outputs
+dist/
 
 # Claude Code
 .claude/

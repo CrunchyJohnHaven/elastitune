@@ -38,14 +38,25 @@ class PersistenceService:
             return None
         return RunSnapshot.model_validate(json.loads(row["snapshot_json"]))
 
+    async def load_connection(self, connection_id: str) -> Optional[Dict[str, Any]]:
+        row = await asyncio.to_thread(self._load_connection_row_sync, connection_id)
+        if not row:
+            return None
+        return json.loads(row["payload_json"])
+
     async def load_report(self, run_id: str) -> Optional[ReportPayload]:
         row = await asyncio.to_thread(self._load_report_row_sync, run_id)
         if not row:
             return None
         return ReportPayload.model_validate(json.loads(row["report_json"]))
 
-    async def list_runs(self, limit: int = 50) -> List[Dict[str, Any]]:
-        rows = await asyncio.to_thread(self._list_runs_sync, limit)
+    async def list_runs(
+        self,
+        limit: int = 50,
+        index_name: Optional[str] = None,
+        completed_only: bool = False,
+    ) -> List[Dict[str, Any]]:
+        rows = await asyncio.to_thread(self._list_runs_sync, limit, index_name, completed_only)
         return [dict(row) for row in rows]
 
     def _connect(self) -> sqlite3.Connection:
@@ -195,10 +206,30 @@ class PersistenceService:
                 (run_id,),
             ).fetchone()
 
-    def _list_runs_sync(self, limit: int) -> List[sqlite3.Row]:
+    def _load_connection_row_sync(self, connection_id: str) -> Optional[sqlite3.Row]:
         with self._connect() as conn:
             return conn.execute(
-                """
+                "SELECT payload_json FROM search_connections WHERE connection_id = ?",
+                (connection_id,),
+            ).fetchone()
+
+    def _list_runs_sync(
+        self,
+        limit: int,
+        index_name: Optional[str],
+        completed_only: bool,
+    ) -> List[sqlite3.Row]:
+        filters = []
+        params: List[Any] = []
+        if index_name:
+            filters.append("index_name = ?")
+            params.append(index_name)
+        if completed_only:
+            filters.append("stage = 'completed'")
+        where_clause = f"WHERE {' AND '.join(filters)}" if filters else ""
+        with self._connect() as conn:
+            return conn.execute(
+                f"""
                 SELECT
                     run_id,
                     mode,
@@ -213,8 +244,9 @@ class PersistenceService:
                     completed_at,
                     updated_at
                 FROM search_runs
+                {where_clause}
                 ORDER BY COALESCE(completed_at, updated_at) DESC
                 LIMIT ?
                 """,
-                (limit,),
+                (*params, limit),
             ).fetchall()

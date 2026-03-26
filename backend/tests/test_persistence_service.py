@@ -41,6 +41,12 @@ def test_persisted_snapshot_and_report_survive_new_run_manager(tmp_path) -> None
         restored_manager = RunManager(persistence=persistence)
         restored_snapshot = await restored_manager.get_snapshot("run_persist")
         restored_report = await restored_manager.get_report("run_persist")
+        restored_connection = await restored_manager.get_connection("conn_persist")
+        completed_runs = await restored_manager.list_search_runs(
+            limit=10,
+            index_name=connection.summary.indexName,
+            completed_only=True,
+        )
 
         assert restored_snapshot is not None
         assert restored_snapshot.stage == "completed"
@@ -48,5 +54,11 @@ def test_persisted_snapshot_and_report_survive_new_run_manager(tmp_path) -> None
         assert restored_report is not None
         assert restored_report.runId == "run_persist"
         assert restored_report.summary.durationSeconds == 42
+        assert restored_report.connectionConfig is not None
+        assert restored_report.connectionConfig.indexName == connection.summary.indexName
+        assert restored_connection is not None
+        assert restored_connection.index_name == connection.summary.indexName
+        assert len(completed_runs) == 1
+        assert completed_runs[0]["run_id"] == "run_persist"
 
     asyncio.run(scenario())

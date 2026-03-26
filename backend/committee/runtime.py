@@ -12,6 +12,7 @@ from .models import (
     CommitteePersona,
     CommitteePersonaView,
     CommitteeReport,
+    CommitteeScoreThresholds,
     CommitteeSummary,
     RewriteAttempt,
     SectionEvaluation,
@@ -57,6 +58,7 @@ class CommitteeRunContext:
         duration_minutes: int = 4,
         auto_stop_on_plateau: bool = True,
         do_no_harm_floor: float = -0.05,
+        score_thresholds: Optional[CommitteeScoreThresholds] = None,
     ) -> None:
         self.run_id = run_id
         self.product_mode = "committee"
@@ -77,6 +79,7 @@ class CommitteeRunContext:
         self.duration_minutes = duration_minutes
         self.auto_stop_on_plateau = auto_stop_on_plateau
         self.do_no_harm_floor = do_no_harm_floor
+        self.score_thresholds = score_thresholds or CommitteeScoreThresholds()
         self.metrics.doNoHarmFloor = do_no_harm_floor
         self.cancel_flag = asyncio.Event()
         self.tasks: list[asyncio.Task] = []

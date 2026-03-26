@@ -5,6 +5,8 @@ import CommitteeScreen from './screens/CommitteeScreen'
 
 const RunScreen = lazy(() => import('./screens/RunScreen'))
 const ReportScreen = lazy(() => import('./screens/ReportScreen'))
+const CompareScreen = lazy(() => import('./screens/CompareScreen'))
+const BenchmarkDashboard = lazy(() => import('./screens/BenchmarkDashboard'))
 const CommitteeRunScreen = lazy(() => import('./screens/CommitteeRunScreen'))
 const CommitteeReportScreen = lazy(() => import('./screens/CommitteeReportScreen'))
 
@@ -36,6 +38,8 @@ export default function AppRoutes() {
         <Route path="/committee" element={<CommitteeScreen />} />
         <Route path="/run/:runId" element={<RunScreen />} />
         <Route path="/report/:runId" element={<ReportScreen />} />
+        <Route path="/compare/:runId1/:runId2" element={<CompareScreen />} />
+        <Route path="/benchmarks" element={<BenchmarkDashboard />} />
         <Route path="/committee/run/:runId" element={<CommitteeRunScreen />} />
         <Route path="/committee/report/:runId" element={<CommitteeReportScreen />} />
         <Route path="*" element={<Navigate to="/" replace />} />

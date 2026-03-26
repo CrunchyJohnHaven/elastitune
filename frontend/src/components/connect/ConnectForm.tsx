@@ -1,12 +1,85 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { api } from '@/lib/api';
-import type { ConnectionSummary, EvalCase, LlmConfig } from '@/types/contracts';
+import type {
+  BenchmarkHealthPreset,
+  ConnectionSummary,
+  EvalCase,
+  LlmConfig,
+  SearchRunListItem,
+} from '@/types/contracts';
 import { PANEL_BORDER, ACCENT_BLUE } from '@/lib/theme';
 import { ELASTIC_PRODUCT_STORE_EVAL_SET } from '@/demo/elasticProductStoreEvalSet';
+import { BOOKS_CATALOG_EVAL_SET } from '@/demo/booksCatalogEvalSet';
+import { WORKPLACE_DOCS_EVAL_SET } from '@/demo/workplaceDocsEvalSet';
+import { SECURITY_SIEM_EVAL_SET } from '@/demo/securitySiemEvalSet';
+import { TMDB_MOVIES_EVAL_SET } from '@/demo/tmdbMoviesEvalSet';
+
+interface BenchmarkPreset {
+  id: string;
+  label: string;
+  description: string;
+  indexName: string;
+  evalSet: EvalCase[];
+  docCount: string;
+  domain: string;
+}
+
+const BENCHMARK_PRESETS: BenchmarkPreset[] = [
+  {
+    id: 'products',
+    label: 'Product Store',
+    description: 'E-commerce beauty products — 931 docs, 8 queries',
+    indexName: 'products-catalog',
+    evalSet: ELASTIC_PRODUCT_STORE_EVAL_SET,
+    docCount: '931',
+    domain: 'E-commerce',
+  },
+  {
+    id: 'books',
+    label: 'Books Catalog',
+    description: 'Classic & modern literature — 2,000 docs, 12 queries',
+    indexName: 'books-catalog',
+    evalSet: BOOKS_CATALOG_EVAL_SET,
+    docCount: '2000',
+    domain: 'Library',
+  },
+  {
+    id: 'workplace',
+    label: 'Workplace Docs',
+    description: 'HR policies & company docs — 15 docs, 12 queries',
+    indexName: 'workplace-docs',
+    evalSet: WORKPLACE_DOCS_EVAL_SET,
+    docCount: '15',
+    domain: 'Enterprise',
+  },
+  {
+    id: 'security',
+    label: 'Security SIEM',
+    description: 'Detection rules, alerts & threat intel — 301 docs, 18 queries',
+    indexName: 'security-siem',
+    evalSet: SECURITY_SIEM_EVAL_SET,
+    docCount: '301',
+    domain: 'Security',
+  },
+  {
+    id: 'tmdb',
+    label: 'TMDB Movies',
+    description: 'Movie metadata & synopses — 8,516 docs, 12 queries',
+    indexName: 'tmdb',
+    evalSet: TMDB_MOVIES_EVAL_SET,
+    docCount: '8516',
+    domain: 'Media',
+  },
+];
 
 interface ConnectFormProps {
-  onConnected: (connectionId: string, summary: ConnectionSummary) => void;
+  onConnected: (
+    connectionId: string,
+    summary: ConnectionSummary,
+    autoRun?: boolean,
+    previousRun?: SearchRunListItem | null,
+  ) => void;
   onDemoStart: (runId: string) => void;
   isLoading: boolean;
   setIsLoading: (v: boolean) => void;
@@ -128,27 +201,107 @@ export default function ConnectForm({
   const [error, setError] = useState<string | null>(null);
   const [uploadedEvalSet, setUploadedEvalSet] = useState<EvalCase[] | null>(null);
   const [uploadedEvalName, setUploadedEvalName] = useState<string | null>(null);
+  const [previousRun, setPreviousRun] = useState<SearchRunListItem | null>(null);
+  const [benchmarkHealth, setBenchmarkHealth] = useState<Record<string, BenchmarkHealthPreset>>({});
+  const [benchmarkReachable, setBenchmarkReachable] = useState<boolean | null>(null);
 
   // LLM settings
   const [llmProvider, setLlmProvider] = useState<LlmConfig['provider']>('openai_compatible');
   const [llmBaseUrl, setLlmBaseUrl] = useState('');
   const [llmModel, setLlmModel] = useState('');
   const [llmApiKey, setLlmApiKey] = useState('');
+  const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
   const benchmarkLoaded =
     esUrl.trim() === benchmarkUrl &&
-    indexName.trim() === benchmarkIndex &&
+    BENCHMARK_PRESETS.some(p => p.indexName === indexName.trim()) &&
     uploadedEvalName === 'Built-in Elastic benchmark eval set';
   const customFieldsOpen =
     customOpen || (!benchmarkLoaded && (!!esUrl || !!indexName || !!apiKey || !!uploadedEvalSet || advancedOpen));
   const showBenchmarkConnectionHelp =
     benchmarkLoaded && error?.includes('Cannot reach Elasticsearch cluster');
+  const previousRunLookupIndex = useMemo(() => indexName.trim() || null, [indexName]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!previousRunLookupIndex) {
+      setPreviousRun(null);
+      return undefined;
+    }
+
+    api.listRuns({ limit: 5, indexName: previousRunLookupIndex, completedOnly: true })
+      .then(({ runs }) => {
+        if (cancelled) return;
+        setPreviousRun(runs[0] ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPreviousRun(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [previousRunLookupIndex]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    api.getBenchmarkHealth(benchmarkUrl)
+      .then((health) => {
+        if (cancelled) return;
+        setBenchmarkReachable(health.reachable);
+        setBenchmarkHealth(
+          Object.fromEntries(health.presets.map((preset) => [preset.indexName, preset]))
+        );
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setBenchmarkReachable(false);
+          setBenchmarkHealth({});
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [benchmarkUrl]);
 
   const handleAnalyze = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!esUrl.trim()) {
-      setError('Elasticsearch URL is required.');
-      return;
+
+    // Auto-load benchmark preset if no custom URL is provided
+    let effectiveUrl = esUrl.trim();
+    let effectiveIndex = indexName.trim();
+    let effectiveApiKey = apiKey.trim();
+    let effectiveEvalSet = uploadedEvalSet;
+    let effectiveAutoEval = autoEval;
+    let isBenchmarkAutoRun = false;
+
+    if (!effectiveUrl) {
+      // Nothing filled in — use the selected benchmark preset (or default to products)
+      const preset = BENCHMARK_PRESETS.find(p => p.id === selectedPreset) ?? BENCHMARK_PRESETS[0];
+      effectiveUrl = benchmarkUrl;
+      effectiveIndex = preset.indexName;
+      effectiveApiKey = '';
+      effectiveEvalSet = preset.evalSet;
+      effectiveAutoEval = false;
+      isBenchmarkAutoRun = true;
+      // Also update state so UI reflects what we're connecting to
+      setEsUrl(benchmarkUrl);
+      setApiKey('');
+      setIndexName(preset.indexName);
+      setUploadedEvalSet(preset.evalSet);
+      setUploadedEvalName('Built-in Elastic benchmark eval set');
+      setAutoEval(false);
     }
+
+    // If benchmark preset was already loaded, also auto-run
+    if (!isBenchmarkAutoRun && benchmarkLoaded) {
+      isBenchmarkAutoRun = true;
+    }
+
     setError(null);
     setIsLoading(true);
 
@@ -162,15 +315,32 @@ export default function ConnectForm({
 
       const resp = await api.connect({
         mode: 'live',
-        esUrl: esUrl.trim(),
-        apiKey: apiKey.trim() || undefined,
-        indexName: indexName.trim() || undefined,
-        uploadedEvalSet: uploadedEvalSet ?? undefined,
-        autoGenerateEval: autoEval,
+        esUrl: effectiveUrl,
+        apiKey: effectiveApiKey || undefined,
+        indexName: effectiveIndex || undefined,
+        uploadedEvalSet: effectiveEvalSet ?? undefined,
+        autoGenerateEval: effectiveAutoEval,
         llm,
       });
 
-      onConnected(resp.connectionId, resp.summary);
+      let matchedPreviousRun =
+        previousRun && previousRun.index_name === effectiveIndex ? previousRun : null;
+      if (!matchedPreviousRun && effectiveIndex) {
+        try {
+          const previous = await api.listRuns({
+            limit: 1,
+            indexName: effectiveIndex,
+            completedOnly: true,
+          });
+          matchedPreviousRun = previous.runs[0] ?? null;
+        } catch {
+          matchedPreviousRun = null;
+        }
+      }
+
+      // For benchmark preset: connect + start optimization in one click
+      // For custom index: show summary card so user can review before starting
+      onConnected(resp.connectionId, resp.summary, isBenchmarkAutoRun, matchedPreviousRun);
     } catch (err) {
       setError(normalizeErrorMessage(err, 'Could not analyze this search index.'));
     } finally {
@@ -227,15 +397,17 @@ export default function ConnectForm({
     }
   };
 
-  const handleLoadBenchmarkPreset = () => {
+  const handleLoadBenchmarkPreset = (presetId?: string) => {
+    const preset = BENCHMARK_PRESETS.find(p => p.id === (presetId ?? 'products')) ?? BENCHMARK_PRESETS[0];
     setEsUrl(benchmarkUrl);
     setApiKey('');
-    setIndexName(benchmarkIndex);
-    setUploadedEvalSet(ELASTIC_PRODUCT_STORE_EVAL_SET);
+    setIndexName(preset.indexName);
+    setUploadedEvalSet(preset.evalSet);
     setUploadedEvalName('Built-in Elastic benchmark eval set');
     setAutoEval(false);
     setCustomOpen(false);
     setAdvancedOpen(false);
+    setSelectedPreset(preset.id);
     setError(null);
   };
 
@@ -251,100 +423,203 @@ export default function ConnectForm({
           boxShadow: benchmarkLoaded ? '0 0 24px rgba(77,163,255,0.12)' : 'none',
         }}
       >
+        <div style={{ marginBottom: 10 }}>
+          <div
+            style={{
+              fontFamily: 'Inter, sans-serif',
+              fontSize: 12,
+              fontWeight: 600,
+              color: '#EEF3FF',
+              marginBottom: 3,
+            }}
+          >
+            Choose a benchmark system to optimize
+          </div>
+          <div
+            style={{
+              fontFamily: 'Inter, sans-serif',
+              fontSize: 11,
+              color: '#9AA4B2',
+              lineHeight: 1.45,
+            }}
+          >
+            Select any Elasticsearch index below to run a one-click optimization and see measurable improvements.
+          </div>
+        </div>
+
+      {previousRun && previousRunLookupIndex && (
+        <div
+          style={{
+            marginBottom: 16,
+            padding: '12px 14px',
+            background: 'rgba(74,222,128,0.06)',
+            borderRadius: 9,
+            border: '1px solid rgba(74,222,128,0.16)',
+          }}
+        >
+          <div
+            style={{
+              fontFamily: 'Inter, sans-serif',
+              fontSize: 12,
+              fontWeight: 600,
+              color: '#EEF3FF',
+              marginBottom: 4,
+            }}
+          >
+            Previous run found
+          </div>
+          <div
+            style={{
+              fontFamily: 'Inter, sans-serif',
+              fontSize: 11,
+              color: '#9AA4B2',
+              lineHeight: 1.5,
+            }}
+          >
+            nDCG improved from {previousRun.baseline_score.toFixed(3)} to {previousRun.best_score.toFixed(3)} on this index.
+            ElastiTune will offer to continue from that stronger baseline.
+          </div>
+        </div>
+      )}
+
         <div
           style={{
             display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: 12,
-            marginBottom: 8,
+            flexDirection: 'column',
+            gap: 6,
           }}
         >
-          <div>
+          {benchmarkReachable === false && (
             <div
               style={{
-                fontFamily: 'Inter, sans-serif',
-                fontSize: 12,
-                fontWeight: 600,
-                color: '#EEF3FF',
-                marginBottom: 3,
-              }}
-            >
-              Elastic benchmark quickstart
-            </div>
-            <div
-              style={{
+                marginBottom: 4,
+                padding: '8px 10px',
+                borderRadius: 8,
+                border: '1px solid rgba(251,113,133,0.18)',
+                background: 'rgba(251,113,133,0.06)',
                 fontFamily: 'Inter, sans-serif',
                 fontSize: 11,
-                color: '#9AA4B2',
+                color: '#FCA5A5',
                 lineHeight: 1.45,
               }}
             >
-              Fill the form with a ready-to-run sample benchmark so you can see how ElastiTune works without setting everything up by hand.
+              Local Elasticsearch is not reachable at {benchmarkUrl}. Start Elasticsearch first, then these benchmark presets will become runnable.
             </div>
-          </div>
-          <button
-            type="button"
-            onClick={handleLoadBenchmarkPreset}
-            style={{
-              border: '1px solid rgba(77,163,255,0.28)',
-              background: benchmarkLoaded ? 'rgba(77,163,255,0.14)' : 'rgba(77,163,255,0.08)',
-              color: '#7CE7FF',
-              borderRadius: 8,
-              padding: '9px 12px',
-              fontFamily: 'Inter, sans-serif',
-              fontSize: 11,
-              fontWeight: 600,
-              cursor: 'pointer',
-              flexShrink: 0,
-            }}
-          >
-            {benchmarkLoaded ? 'Preset loaded' : 'Use benchmark preset'}
-          </button>
-        </div>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-            gap: 8,
-          }}
-        >
-          {[
-            { label: 'Cluster', value: benchmarkUrl },
-            { label: 'Index', value: benchmarkIndex },
-            { label: 'Eval cases', value: String(ELASTIC_PRODUCT_STORE_EVAL_SET.length) },
-          ].map(item => (
-            <div
-              key={item.label}
-              style={{
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(255,255,255,0.06)',
-                borderRadius: 7,
-                padding: '8px 10px',
-              }}
-            >
-              <div
+          )}
+          {BENCHMARK_PRESETS.map(preset => {
+            const isSelected = selectedPreset === preset.id || (!selectedPreset && indexName === preset.indexName && benchmarkLoaded);
+            const health = benchmarkHealth[preset.indexName];
+            const setupRequired = health ? !health.ready : false;
+            return (
+              <button
+                key={preset.id}
+                type="button"
+                onClick={() => handleLoadBenchmarkPreset(preset.id)}
                 style={{
-                  fontFamily: 'Inter, sans-serif',
-                  fontSize: 10,
-                  color: '#6B7480',
-                  marginBottom: 4,
+                  display: 'grid',
+                  gridTemplateColumns: '1fr auto',
+                  gap: 8,
+                  alignItems: 'center',
+                  width: '100%',
+                  padding: '10px 12px',
+                  background: isSelected ? 'rgba(77,163,255,0.12)' : 'rgba(255,255,255,0.03)',
+                  border: `1px solid ${isSelected ? 'rgba(77,163,255,0.35)' : 'rgba(255,255,255,0.06)'}`,
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'border-color 0.15s, background 0.15s',
                 }}
               >
-                {item.label}
-              </div>
-              <div
-                style={{
-                  fontFamily: 'JetBrains Mono, monospace',
-                  fontSize: 10,
-                  color: '#EEF3FF',
-                  wordBreak: 'break-word',
-                }}
-              >
-                {item.value}
-              </div>
-            </div>
-          ))}
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                    <span
+                      style={{
+                        fontFamily: 'Inter, sans-serif',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: isSelected ? '#7CE7FF' : '#EEF3FF',
+                      }}
+                    >
+                      {preset.label}
+                    </span>
+                    <span
+                      style={{
+                        fontFamily: 'JetBrains Mono, monospace',
+                        fontSize: 9,
+                        color: '#6B7480',
+                        background: 'rgba(255,255,255,0.05)',
+                        padding: '1px 6px',
+                        borderRadius: 3,
+                      }}
+                    >
+                      {preset.domain}
+                    </span>
+                    {setupRequired && (
+                      <span
+                        style={{
+                          fontFamily: 'Inter, sans-serif',
+                          fontSize: 9,
+                          fontWeight: 600,
+                          color: '#FBBF24',
+                          background: 'rgba(251,191,36,0.1)',
+                          border: '1px solid rgba(251,191,36,0.18)',
+                          padding: '1px 6px',
+                          borderRadius: 999,
+                        }}
+                      >
+                        Setup required
+                      </span>
+                    )}
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: 'Inter, sans-serif',
+                      fontSize: 10,
+                      color: '#6B7480',
+                    }}
+                  >
+                    {preset.description}
+                  </div>
+                  {health && (
+                    <div
+                      style={{
+                        marginTop: 4,
+                        fontFamily: 'JetBrains Mono, monospace',
+                        fontSize: 9,
+                        color: setupRequired ? '#FBBF24' : '#4ADE80',
+                      }}
+                    >
+                      {setupRequired
+                        ? `ready after ${health.expectedDocCount} docs · current ${health.docCount}`
+                        : `ready · ${health.docCount} docs indexed`}
+                    </div>
+                  )}
+                  {setupRequired && (
+                    <div
+                      style={{
+                        marginTop: 4,
+                        fontFamily: 'Inter, sans-serif',
+                        fontSize: 10,
+                        color: '#9AA4B2',
+                      }}
+                    >
+                      Fix with: <span style={{ color: '#EEF3FF' }}>{health.setupCommand}</span>
+                    </div>
+                  )}
+                </div>
+                <div
+                  style={{
+                    fontFamily: 'JetBrains Mono, monospace',
+                    fontSize: 10,
+                    color: isSelected ? '#4ADE80' : setupRequired ? '#FBBF24' : '#4B5563',
+                    fontWeight: 600,
+                  }}
+                >
+                  {isSelected ? 'SELECTED' : setupRequired ? 'SETUP' : 'SELECT'}
+                </div>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -774,7 +1049,7 @@ export default function ConnectForm({
           }}
         >
           {isLoading && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />}
-          {benchmarkLoaded && !customFieldsOpen ? 'Analyze Benchmark' : 'Analyze Search Index'}
+          {customFieldsOpen ? 'Analyze Search Index' : 'Run Benchmark'}
         </button>
 
         <button

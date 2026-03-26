@@ -47,6 +47,9 @@ export function useRunSocket(runId: string | null) {
             toast.success('Optimization complete \u2014 View Report');
           }
           break;
+        case 'run.complete':
+          setStage(event.payload.stage);
+          break;
         case 'experiment.completed': {
           mergeExperiment(event.payload);
           // Toast on new best score

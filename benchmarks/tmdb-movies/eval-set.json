@@ -1,0 +1,74 @@
+[
+  {
+    "id": "tmdb_eval_space",
+    "query": "space adventure sci-fi",
+    "relevantDocIds": ["6795", "316784", "5551", "10690"],
+    "difficulty": "easy"
+  },
+  {
+    "id": "tmdb_eval_romcom",
+    "query": "romantic comedy new york city",
+    "relevantDocIds": ["22597", "31016", "10641", "12637"],
+    "difficulty": "medium"
+  },
+  {
+    "id": "tmdb_eval_thriller",
+    "query": "serial killer thriller detective",
+    "relevantDocIds": ["10692", "11592", "49021", "73567"],
+    "difficulty": "medium"
+  },
+  {
+    "id": "tmdb_eval_animated",
+    "query": "animated family movie",
+    "relevantDocIds": ["38722", "5854", "112205", "491418"],
+    "difficulty": "easy"
+  },
+  {
+    "id": "tmdb_eval_ww2",
+    "query": "world war two soldiers",
+    "relevantDocIds": ["10590", "10105", "9104", "112304"],
+    "difficulty": "medium"
+  },
+  {
+    "id": "tmdb_eval_heist",
+    "query": "heist bank robbery crime",
+    "relevantDocIds": ["336004", "11088", "59108", "250066", "8848"],
+    "difficulty": "easy"
+  },
+  {
+    "id": "tmdb_eval_zombie",
+    "query": "zombie apocalypse survival horror",
+    "relevantDocIds": ["273477", "153509", "219247", "26860"],
+    "difficulty": "easy"
+  },
+  {
+    "id": "tmdb_eval_ai",
+    "query": "artificial intelligence robot future",
+    "relevantDocIds": ["644", "2048", "84329", "240483", "43353"],
+    "difficulty": "easy"
+  },
+  {
+    "id": "tmdb_eval_superhero",
+    "query": "superhero marvel avengers",
+    "relevantDocIds": ["299537", "9320", "299534", "24428", "299536", "99861"],
+    "difficulty": "easy"
+  },
+  {
+    "id": "tmdb_eval_western",
+    "query": "western cowboy desert",
+    "relevantDocIds": ["3116", "476", "455185", "294"],
+    "difficulty": "hard"
+  },
+  {
+    "id": "tmdb_eval_ocean",
+    "query": "underwater ocean adventure",
+    "relevantDocIds": ["443791", "102295", "28512", "551"],
+    "difficulty": "medium"
+  },
+  {
+    "id": "tmdb_eval_timetravel",
+    "query": "time travel paradox",
+    "relevantDocIds": ["384521", "183011", "49530", "30049"],
+    "difficulty": "hard"
+  }
+]

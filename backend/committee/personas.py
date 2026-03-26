@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import logging
 import uuid
 from typing import List, Optional
 
-from .industry_profiles import IndustryProfile, detect_industry_profile
+from .industry_profiles import IndustryProfile, detect_industry_profile, get_industry_profile
 from .models import CommitteeDocument, CommitteePersona
+
+logger = logging.getLogger(__name__)
 
 
 _SEED_PERSONA_DETAILS = [
@@ -71,6 +74,194 @@ _SEED_PERSONA_DETAILS = [
     },
 ]
 
+_SBA_PERSONAS = [
+    CommitteePersona(
+        id="committee_sba_cio",
+        name="Hartley Caldwell",
+        title="Chief Information Officer, SBA",
+        organization="Small Business Administration",
+        roleInDecision="Final technical authority",
+        authorityWeight=0.25,
+        priorities=[
+            "Cybersecurity and data sovereignty",
+            "FedRAMP compliance",
+            "Integration with existing SBA systems",
+            "Cost justification for OMB",
+        ],
+        concerns=[
+            "Another AI vendor overpromising",
+            "Maintenance burden on thin IT staff",
+            "Data leaving SBA control",
+            "Audit exposure if the system fails",
+        ],
+        decisionCriteria=[
+            "Proven federal deployments",
+            "Air-gap capability",
+            "FedRAMP Moderate readiness",
+            "Five-year total cost of ownership",
+        ],
+        likelyObjections=[
+            "How does this integrate with our current document management?",
+            "What is the maintenance burden?",
+            "Show me the FedRAMP package.",
+        ],
+        whatWinsThemOver=[
+            "Search.gov scale proof",
+            "CISA deployment proof",
+            "Carahsoft procurement path",
+        ],
+        skepticismLevel=7,
+        domainExpertise="technology",
+        politicalMotivations=["Protect security posture without adding operational burden"],
+    ),
+    CommitteePersona(
+        id="committee_sba_gc",
+        name="General Counsel",
+        title="General Counsel, SBA",
+        organization="Small Business Administration",
+        roleInDecision="Domain owner and internal champion",
+        authorityWeight=0.30,
+        priorities=[
+            "Reducing litigation risk from inconsistent opinions",
+            "Attorney adoption",
+            "Institutional knowledge retention",
+            "Defensibility of AI-assisted opinions",
+        ],
+        concerns=[
+            "AI making legal determinations",
+            "Liability if the system surfaces the wrong precedent",
+            "Attorney resistance to new tools",
+            "Political optics of AI replacing lawyers",
+        ],
+        decisionCriteria=[
+            "Citation trail transparency",
+            "Human in the loop",
+            "High attorney adoption",
+            "OIG audit alignment",
+        ],
+        likelyObjections=[
+            "Attorneys will not trust AI for legal research.",
+            "What happens when it is wrong?",
+        ],
+        whatWinsThemOver=[
+            "Full citation trails",
+            "Explainability",
+            "Search framing instead of AI lawyer framing",
+        ],
+        skepticismLevel=8,
+        domainExpertise="legal",
+        politicalMotivations=["Protect professional trust and defensibility"],
+    ),
+    CommitteePersona(
+        id="committee_sba_budget",
+        name="Budget Director",
+        title="Chief Financial Officer / Budget Director, SBA",
+        organization="Small Business Administration",
+        roleInDecision="Economic approver",
+        authorityWeight=0.25,
+        priorities=[
+            "Quantified ROI with defensible math",
+            "Fit within existing budget lines",
+            "No surprise implementation costs",
+            "OMB justification narrative",
+        ],
+        concerns=[
+            "Inflated vendor ROI projections",
+            "Hidden implementation costs",
+            "Multi-year commitment with unclear exit",
+            "Hiring alternatives may be cheaper",
+        ],
+        decisionCriteria=[
+            "Payback under 18 months",
+            "Five-year TCO",
+            "Comparison to hiring alternative",
+            "Existing procurement vehicle",
+        ],
+        likelyObjections=[
+            "The ROI math feels stretched.",
+            "What is the actual license cost?",
+        ],
+        whatWinsThemOver=[
+            "Hard math with defensible baselines",
+            "Carahsoft pricing path",
+            "Comparison to labor alternatives",
+        ],
+        skepticismLevel=9,
+        domainExpertise="finance",
+        politicalMotivations=["Avoid defendable spend without solid proof"],
+    ),
+    CommitteePersona(
+        id="committee_sba_field",
+        name="District Office Attorney",
+        title="Senior Attorney, SBA District Office",
+        organization="Small Business Administration",
+        roleInDecision="End user and adoption signal",
+        authorityWeight=0.10,
+        priorities=[
+            "Save time on daily work",
+            "Find relevant precedents faster",
+            "Avoid extra bureaucracy",
+            "Work reliably on existing hardware",
+        ],
+        concerns=[
+            "Another IT system that breaks",
+            "Replacing professional judgment with algorithms",
+            "Training time versus value",
+        ],
+        decisionCriteria=[
+            "Minutes instead of hours to find precedent",
+            "Natural language queries",
+            "Minimal training",
+        ],
+        likelyObjections=[
+            "My current method works fine.",
+            "I do not want AI telling me what the law says.",
+        ],
+        whatWinsThemOver=[
+            "Live search demo",
+            "Search-not-lawyer framing",
+            "Hours-to-minutes proof",
+        ],
+        skepticismLevel=6,
+        domainExpertise="field legal operations",
+        politicalMotivations=["Protect autonomy and avoid friction"],
+    ),
+    CommitteePersona(
+        id="committee_sba_oig",
+        name="OIG Auditor",
+        title="Assistant Inspector General for Auditing, SBA OIG",
+        organization="Small Business Administration",
+        roleInDecision="Shadow stress-test persona",
+        authorityWeight=0.10,
+        priorities=[
+            "Accuracy of OIG finding representation",
+            "Root-cause alignment",
+            "Auditability of the system itself",
+        ],
+        concerns=[
+            "Vendor cherry-picking OIG data",
+            "Correlation presented as causation",
+            "Technology over-claiming against process recommendations",
+        ],
+        decisionCriteria=[
+            "Faithful representation of audit findings",
+            "Clear mapping from finding to capability",
+            "System output auditability",
+        ],
+        likelyObjections=[
+            "The audit language is overstated.",
+            "This recommendation was about controls, not a product.",
+        ],
+        whatWinsThemOver=[
+            "Tighter caveats",
+            "Careful mapping from findings to controls",
+        ],
+        skepticismLevel=10,
+        domainExpertise="audit",
+        politicalMotivations=["Prevent overclaiming against official findings"],
+    ),
+]
+
 
 @dataclass
 class CommitteePersonaBuild:
@@ -79,28 +270,55 @@ class CommitteePersonaBuild:
     warnings: List[str] = field(default_factory=list)
 
 
+def seeded_sba_personas() -> List[CommitteePersona]:
+    return [persona.model_copy(deep=True) for persona in _SBA_PERSONAS]
+
+
 async def build_committee_personas(
     document: CommitteeDocument,
     committee_description: Optional[str] = None,
     provided_personas: Optional[List[CommitteePersona]] = None,
     use_seed_personas: bool = True,
     llm_service=None,
+    industry_profile_id: Optional[str] = None,
 ) -> CommitteePersonaBuild:
-    profile = detect_industry_profile(
-        [document.documentName, document.rawText] + [section.title for section in document.sections[:8]]
+    warnings: List[str] = []
+    profile = (
+        get_industry_profile(industry_profile_id)
+        if industry_profile_id
+        else detect_industry_profile(
+            [document.documentName, document.rawText] + [section.title for section in document.sections[:8]]
+        )
     )
 
     if provided_personas:
-        return CommitteePersonaBuild(personas=provided_personas, profile=profile)
+        return CommitteePersonaBuild(
+            personas=_normalize_weights(provided_personas, warnings),
+            profile=profile,
+            warnings=warnings,
+        )
+
+    if use_seed_personas:
+        government_profile = get_industry_profile("government")
+        return CommitteePersonaBuild(
+            personas=seeded_sba_personas(),
+            profile=government_profile,
+            warnings=warnings,
+        )
 
     if llm_service and llm_service.available:
-        prompt = committee_description or _summarize_document(document)
+        prompt = committee_description or _summarize_document(document, profile.label)
         generated = await llm_service.generate_committee_personas(prompt)
-        personas = _coerce_generated_personas(generated)
+        personas = _normalize_weights(_coerce_generated_personas(generated), warnings)
         if personas:
-            return CommitteePersonaBuild(personas=personas, profile=profile)
+            return CommitteePersonaBuild(personas=personas, profile=profile, warnings=warnings)
+        warnings.append("AI persona generation returned no valid personas; profile-based committee defaults were used.")
 
-    return CommitteePersonaBuild(personas=_build_seed_personas(profile), profile=profile)
+    return CommitteePersonaBuild(
+        personas=_normalize_weights(_build_seed_personas(profile), warnings),
+        profile=profile,
+        warnings=warnings,
+    )
 
 
 def _build_seed_personas(profile: IndustryProfile) -> List[CommitteePersona]:
@@ -157,9 +375,31 @@ def _coerce_generated_personas(generated: list) -> List[CommitteePersona]:
     return personas
 
 
-def _summarize_document(document: CommitteeDocument) -> str:
+def _normalize_weights(personas: List[CommitteePersona], warnings: List[str]) -> List[CommitteePersona]:
+    if not personas:
+        return personas
+    total = sum(max(persona.authorityWeight, 0.0) for persona in personas)
+    if 0.99 <= total <= 1.01:
+        return personas
+    if total <= 0:
+        even_weight = round(1 / len(personas), 4)
+        warnings.append("Persona authority weights were invalid and were reset evenly.")
+        logger.warning("Committee persona weights were non-positive; reset evenly.")
+        return [
+            persona.model_copy(update={"authorityWeight": even_weight})
+            for persona in personas
+        ]
+    warnings.append("Persona authority weights were normalized to sum to 1.0.")
+    logger.warning("Committee persona weights normalized from total=%s", total)
+    return [
+        persona.model_copy(update={"authorityWeight": round(max(persona.authorityWeight, 0.0) / total, 4)})
+        for persona in personas
+    ]
+
+
+def _summarize_document(document: CommitteeDocument, profile_label: str) -> str:
     sections = "\n".join(
         f"- {section.title}: {section.content[:180]}"
         for section in document.sections[:6]
     )
-    return f"Document: {document.documentName}\n{sections}"
+    return f"Industry context: {profile_label}\nDocument: {document.documentName}\n{sections}"

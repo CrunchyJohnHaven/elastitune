@@ -1,5 +1,5 @@
 import type {
-  ConnectRequest, ConnectResponse, RunSnapshot, ReportPayload
+  BenchmarkHealthPreset, ConnectRequest, ConnectResponse, QueryPreviewPayload, RunSnapshot, ReportPayload, SearchRunListItem
 } from '@/types/contracts';
 import type {
   CommitteeConnectionResponse,
@@ -55,15 +55,17 @@ export const api = {
     maxExperiments?: number;
     personaCount?: number;
     autoStopOnPlateau?: boolean;
+    previousRunId?: string;
   }) =>
     request<{ runId: string; stage: string }>('/runs', {
       method: 'POST',
       body: JSON.stringify({
         connectionId,
         durationMinutes: opts?.durationMinutes ?? 30,
-        maxExperiments: opts?.maxExperiments ?? 60,
+        maxExperiments: opts?.maxExperiments ?? 200,
         personaCount: opts?.personaCount ?? 36,
         autoStopOnPlateau: opts?.autoStopOnPlateau ?? true,
+        previousRunId: opts?.previousRunId ?? null,
       }),
     }),
 
@@ -76,11 +78,35 @@ export const api = {
   getReport: (runId: string) =>
     request<ReportPayload>(`/runs/${runId}/report`),
 
+  previewQuery: (runId: string, queryId: string) =>
+    request<QueryPreviewPayload>(`/runs/${runId}/preview-query?queryId=${encodeURIComponent(queryId)}`),
+
+  listRuns: (opts?: {
+    limit?: number;
+    indexName?: string;
+    completedOnly?: boolean;
+  }) => {
+    const params = new URLSearchParams();
+    if (opts?.limit) params.set('limit', String(opts.limit));
+    if (opts?.indexName) params.set('indexName', opts.indexName);
+    if (opts?.completedOnly) params.set('completedOnly', 'true');
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    return request<{ runs: SearchRunListItem[] }>(`/runs${suffix}`);
+  },
+
+  getBenchmarkHealth: (esUrl?: string) => {
+    const params = new URLSearchParams();
+    if (esUrl) params.set('esUrl', esUrl);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    return request<{ reachable: boolean; presets: BenchmarkHealthPreset[] }>(`/connect/benchmarks${suffix}`);
+  },
+
   connectCommittee: async (req: {
     file: File;
     evaluationMode: 'full_committee' | 'adversarial' | 'champion_only';
     useSeedPersonas: boolean;
     committeeDescription?: string;
+    industryProfileId?: string;
     llm?: {
       provider: 'openai_compatible' | 'openai' | 'anthropic' | 'disabled';
       baseUrl?: string;
@@ -94,6 +120,7 @@ export const api = {
     form.append('evaluationMode', req.evaluationMode);
     form.append('useSeedPersonas', String(req.useSeedPersonas));
     if (req.committeeDescription) form.append('committeeDescription', req.committeeDescription);
+    if (req.industryProfileId) form.append('industryProfileId', req.industryProfileId);
     if (req.llm) form.append('llmJson', JSON.stringify(req.llm));
     if (req.personas) form.append('personasJson', JSON.stringify(req.personas));
     const res = await fetch(`${BASE}/committee/connect`, {
@@ -112,6 +139,15 @@ export const api = {
     maxRewrites?: number;
     autoStopOnPlateau?: boolean;
     doNoHarmFloor?: number;
+    scoreThresholds?: {
+      supportive?: number;
+      cautiouslyInterested?: number;
+      neutral?: number;
+      skeptical?: number;
+      positiveEmotion?: number;
+      enthusiasticQuote?: number;
+      cautiousQuote?: number;
+    };
   }) =>
     request<{ runId: string; stage: string; productMode: 'committee' }>('/committee/runs', {
       method: 'POST',
@@ -121,6 +157,7 @@ export const api = {
         maxRewrites: opts?.maxRewrites ?? 36,
         autoStopOnPlateau: opts?.autoStopOnPlateau ?? true,
         doNoHarmFloor: opts?.doNoHarmFloor ?? -0.05,
+        scoreThresholds: opts?.scoreThresholds,
       }),
     }),
 

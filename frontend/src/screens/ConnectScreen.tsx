@@ -4,10 +4,11 @@ import { motion } from 'framer-motion';
 import ConnectForm from '@/components/connect/ConnectForm';
 import ClusterSummaryCard from '@/components/connect/ClusterSummaryCard';
 import DemoPreviewCanvas from '@/components/connect/DemoPreviewCanvas';
+import RunHistory from '@/components/connect/RunHistory';
 import { useAppStore } from '@/store/useAppStore';
 import { useToast } from '@/components/ui/ToastProvider';
 import { api } from '@/lib/api';
-import type { ConnectionSummary } from '@/types/contracts';
+import type { ConnectionSummary, SearchRunListItem } from '@/types/contracts';
 import { Link } from 'react-router-dom';
 import { PREVIEW_EXPERIMENTS, PREVIEW_PERSONAS } from '@/demo/previewSeed';
 
@@ -20,11 +21,44 @@ export default function ConnectScreen() {
   const [connectedId, setConnectedId] = useState<string | null>(null);
   const [summary, setSummary] = useState<ConnectionSummary | null>(null);
   const [startingRun, setStartingRun] = useState(false);
+  const [previousRun, setPreviousRun] = useState<SearchRunListItem | null>(null);
 
-  const handleConnected = (connectionId: string, sum: ConnectionSummary) => {
+  const handleConnected = async (
+    connectionId: string,
+    sum: ConnectionSummary,
+    autoRun?: boolean,
+    previousRunCandidate?: SearchRunListItem | null,
+  ) => {
     setConnection(connectionId, sum);
     setConnectedId(connectionId);
     setSummary(sum);
+    setPreviousRun(previousRunCandidate ?? null);
+
+    // If autoRun is set (benchmark preset), skip the summary card and go straight to optimization
+    if (autoRun) {
+      toast.info(
+        previousRunCandidate
+          ? 'Previous run found — continuing from the strongest saved profile…'
+          : 'Benchmark detected — starting optimization\u2026'
+      );
+      try {
+        const resp = await api.startRun(connectionId, {
+          durationMinutes: 30,
+          maxExperiments: 200,
+          personaCount: 36,
+          autoStopOnPlateau: true,
+          previousRunId: previousRunCandidate?.run_id,
+        });
+        setRunId(resp.runId);
+        navigate(`/run/${resp.runId}`);
+      } catch (err) {
+        toast.error('Failed to start optimization. Check your connection.');
+        console.error('Auto-start run failed:', err);
+        setIsLoading(false);
+      }
+      return;
+    }
+
     toast.success(`Connected to ${sum.clusterName}`);
   };
 
@@ -41,6 +75,7 @@ export default function ConnectScreen() {
       maxExperiments: number;
       personaCount: number;
       autoStopOnPlateau: boolean;
+      previousRunId?: string;
     }
   ) => {
     setStartingRun(true);
@@ -194,6 +229,20 @@ export default function ConnectScreen() {
               <br />
               2. Click <span style={{ color: '#EEF3FF' }}>Use benchmark preset</span> if you want a real local benchmark with a fixed test set.
             </div>
+            <div style={{ marginTop: 10 }}>
+              <Link
+                to="/benchmarks"
+                style={{
+                  fontFamily: 'Inter, sans-serif',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: '#7CE7FF',
+                  textDecoration: 'none',
+                }}
+              >
+                Open benchmark dashboard
+              </Link>
+            </div>
           </div>
 
           {/* Form card */}
@@ -248,11 +297,14 @@ export default function ConnectScreen() {
               <ClusterSummaryCard
                 summary={summary}
                 connectionId={connectedId}
+                previousRun={previousRun}
                 onStartOptimization={handleStartOptimization}
                 isLoading={startingRun}
               />
             </motion.div>
           )}
+
+          <RunHistory />
 
           {/* Footer note */}
           <p

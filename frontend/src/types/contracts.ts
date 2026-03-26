@@ -196,6 +196,13 @@ export interface HeroMetrics {
   scoreTimeline: Array<{ t: number; score: number }>;
 }
 
+export interface RunConfig {
+  durationMinutes: number;
+  maxExperiments: number;
+  personaCount: number;
+  autoStopOnPlateau: boolean;
+}
+
 export interface RunSnapshot {
   runId: string;
   productMode: ProductMode;
@@ -209,8 +216,32 @@ export interface RunSnapshot {
   experiments: ExperimentRecord[];
   compression: CompressionSummary;
   warnings: string[];
+  runConfig?: RunConfig;
   startedAt?: string;
   completedAt?: string | null;
+}
+
+export interface QueryBreakdownRow {
+  baselineTopResults?: Array<{
+    docId: string;
+    title: string;
+    excerpt: string;
+    score: number;
+  }>;
+  bestTopResults?: Array<{
+    docId: string;
+    title: string;
+    excerpt: string;
+    score: number;
+  }>;
+  queryId: string;
+  query: string;
+  difficulty: string;
+  baselineScore: number;
+  bestScore: number;
+  deltaPct: number;
+  failureReason?: string | null;
+  topRelevantDocIds: string[];
 }
 
 export interface PersonaImpactRow {
@@ -239,18 +270,74 @@ export interface ReportPayload {
     projectedMonthlySavingsUsd?: number | null;
   };
   connection: ConnectionSummary;
+  connectionConfig?: {
+    mode: RunMode;
+    esUrl?: string | null;
+    apiKey?: string | null;
+    indexName?: string | null;
+    evalSet: EvalCase[];
+    llm?: LlmConfig | null;
+  } | null;
   searchProfileBefore: SearchProfile;
   searchProfileAfter: SearchProfile;
   diff: SearchProfileChange[];
+  queryBreakdown: QueryBreakdownRow[];
   personaImpact: PersonaImpactRow[];
   experiments: ExperimentRecord[];
   compression: CompressionSummary;
   warnings: string[];
+  previousRunId?: string | null;
+}
+
+export interface SearchRunListItem {
+  run_id: string;
+  mode: RunMode;
+  stage: RunStage;
+  index_name?: string | null;
+  cluster_name?: string | null;
+  baseline_score: number;
+  best_score: number;
+  improvement_pct: number;
+  experiments_run: number;
+  started_at?: string | null;
+  completed_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface BenchmarkHealthPreset {
+  id: string;
+  label: string;
+  indexName: string;
+  expectedDocCount: number;
+  docCount: number;
+  ready: boolean;
+  setupCommand: string;
+  reachable: boolean;
+}
+
+export interface QueryPreviewPayload {
+  queryId: string;
+  query: string;
+  baselineResults: Array<{
+    docId: string;
+    title: string;
+    excerpt: string;
+    score: number;
+  }>;
+  optimizedResults: Array<{
+    docId: string;
+    title: string;
+    excerpt: string;
+    score: number;
+  }>;
+  baselineQueryDsl?: Record<string, unknown> | null;
+  optimizedQueryDsl?: Record<string, unknown> | null;
 }
 
 export type RunSocketEvent =
   | { type: 'snapshot'; payload: RunSnapshot }
   | { type: 'run.stage'; payload: { runId: string; stage: RunStage; message?: string } }
+  | { type: 'run.complete'; payload: { runId: string; stage: RunStage } }
   | { type: 'experiment.completed'; payload: ExperimentRecord }
   | { type: 'persona.batch'; payload: { runId: string; personas: PersonaRuntime[] } }
   | { type: 'metrics.tick'; payload: HeroMetrics }

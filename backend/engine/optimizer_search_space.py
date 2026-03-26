@@ -3,9 +3,9 @@ import copy
 import random
 from ..models.contracts import SearchProfile, SearchProfileChange
 
-BOOST_VALUES = [1.0, 1.5, 2.0, 3.0, 4.0, 5.0]
+BOOST_VALUES = [0.1, 0.5, 0.8, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0]
 MULTI_MATCH_TYPES = ["best_fields", "most_fields", "cross_fields", "phrase"]
-MIN_SHOULD_MATCH_VALUES = ["100%", "75%", "2<75%", "3<80%", "50%"]
+MIN_SHOULD_MATCH_VALUES = ["100%", "75%", "2<75%", "3<80%", "50%", "1", "2", "30%"]
 TIE_BREAKER_VALUES = [0.0, 0.1, 0.2, 0.3, 0.5]
 PHRASE_BOOST_VALUES = [0.0, 0.5, 1.0, 1.5, 2.0]
 FUZZINESS_VALUES = ["0", "AUTO"]
@@ -14,6 +14,8 @@ FUSION_METHODS = ["weighted_sum", "rrf"]
 RRF_RANK_CONSTANTS = [10, 20, 40, 60]
 KNN_K_VALUES = [10, 20, 30, 50]
 NUM_CANDIDATES_VALUES = [50, 100, 150, 250, 400]
+SECURITY_FIELD_TOKENS = ("severity", "mitre", "source", "rule", "category", "tactic")
+SECURITY_PRIORITY_BOOSTS = [2.0, 3.0, 4.0, 5.0]
 
 
 def generate_mutations(profile: SearchProfile, experiment_history: List[Dict],
@@ -168,7 +170,14 @@ def generate_mutations(profile: SearchProfile, experiment_history: List[Dict],
     # Filter out recently reverted paths
     mutations = [(p, c) for p, c in mutations if c.path not in recently_reverted]
 
-    return mutations
+    # Filter out invalid combinations (cross_fields doesn't support fuzziness in ES)
+    valid_mutations = []
+    for p, c in mutations:
+        if p.multiMatchType == "cross_fields" and p.fuzziness != "0":
+            continue  # ES rejects this combo
+        valid_mutations.append((p, c))
+
+    return valid_mutations
 
 
 def pick_mutation(mutations: List[Tuple], rng: Optional[random.Random] = None) -> Optional[Tuple]:
@@ -177,3 +186,25 @@ def pick_mutation(mutations: List[Tuple], rng: Optional[random.Random] = None) -
         return None
     r = rng or random
     return r.choice(mutations)
+
+
+def generate_security_field_mutations(profile: SearchProfile) -> List[SearchProfileChange]:
+    """Prioritize boosts for security-relevant fields when they are present."""
+    changes: List[SearchProfileChange] = []
+    for index, field_entry in enumerate(profile.lexicalFields):
+        field_name = str(field_entry.get("field", "")).lower()
+        if not any(token in field_name for token in SECURITY_FIELD_TOKENS):
+            continue
+        current_boost = field_entry.get("boost", 1.0)
+        for new_boost in SECURITY_PRIORITY_BOOSTS:
+            if new_boost == current_boost:
+                continue
+            changes.append(
+                SearchProfileChange(
+                    path=f"lexicalFields[{index}].boost",
+                    before=current_boost,
+                    after=new_boost,
+                    label=f"{field_entry.get('field', f'field_{index}')} boost {current_boost} → {new_boost}",
+                )
+            )
+    return changes

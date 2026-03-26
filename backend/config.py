@@ -10,7 +10,7 @@ class Settings:
     cost_per_gb_per_month: float = float(os.getenv("COST_PER_GB_MONTH", "0.095"))
     default_persona_count: int = 24
     max_sample_docs: int = 120
-    keep_threshold: float = 0.003
+    keep_threshold: float = 0.001
     metrics_interval_seconds: float = 2.0
     persona_batch_interval_seconds: float = 1.5
     host: str = os.getenv("HOST", "0.0.0.0")

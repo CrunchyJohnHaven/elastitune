@@ -11,6 +11,7 @@ from .models import (
     CommitteeEvaluationMode,
     CommitteePersona,
     CommitteePersonaView,
+    CommitteeScoreThresholds,
     DocumentSection,
     PersonaSectionRollup,
     SectionEvaluation,
@@ -28,10 +29,12 @@ class CommitteeEvaluator:
         profile: IndustryProfile,
         llm_service: Optional[LLMService] = None,
         warnings: Optional[List[str]] = None,
+        thresholds: Optional[CommitteeScoreThresholds] = None,
     ) -> None:
         self.profile = profile
         self.llm = llm_service
         self.warnings = warnings if warnings is not None else []
+        self.thresholds = thresholds or CommitteeScoreThresholds()
 
     async def evaluate_section(
         self,
@@ -140,7 +143,7 @@ class CommitteeEvaluator:
                 default="",
             )
 
-        sentiment = _score_to_sentiment(average_score)
+        sentiment = _score_to_sentiment(average_score, self.thresholds)
         evaluation_source = "mixed" if len(set(sources)) > 1 else (sources[0] if sources else "heuristic")
         evaluation_confidence = round(sum(confidences) / max(len(confidences), 1), 2)
         return CommitteePersonaView(
@@ -233,8 +236,12 @@ class CommitteeEvaluator:
             + risk_score * 0.10
             + completeness * 0.10
         )
-        quote = _reaction_quote(persona, risk_flags, missing, composite)
-        emotional = "positive" if composite >= 0.65 else "negative" if composite < 0.42 else "neutral"
+        quote = _reaction_quote(persona, risk_flags, missing, composite, self.thresholds)
+        emotional = (
+            "positive"
+            if composite >= self.thresholds.positiveEmotion
+            else "negative" if composite < 0.42 else "neutral"
+        )
 
         return SectionEvaluation(
             personaId=persona.id,
@@ -309,14 +316,15 @@ def _reaction_quote(
     risk_flags: List[str],
     missing: List[str],
     composite: float,
+    thresholds: CommitteeScoreThresholds,
 ) -> str:
     if risk_flags:
         return risk_flags[0]
     if missing:
         return f"I still need to see {missing[0].lower()} before I can support this."
-    if composite >= 0.72:
+    if composite >= thresholds.enthusiasticQuote:
         return f"This section speaks directly to my priorities around {persona.priorities[0].lower()}."
-    if composite >= 0.55:
+    if composite >= thresholds.cautiousQuote:
         return "This is moving in the right direction, but I need one more concrete proof point."
     return "I'm not convinced yet; this still feels too generic for our buying committee."
 
@@ -333,14 +341,14 @@ def _bounded(value: float) -> float:
     return max(0.0, min(1.0, value))
 
 
-def _score_to_sentiment(score: float) -> str:
-    if score >= 0.72:
+def _score_to_sentiment(score: float, thresholds: CommitteeScoreThresholds) -> str:
+    if score >= thresholds.supportive:
         return "supportive"
-    if score >= 0.58:
+    if score >= thresholds.cautiouslyInterested:
         return "cautiously_interested"
-    if score >= 0.45:
+    if score >= thresholds.neutral:
         return "neutral"
-    if score >= 0.32:
+    if score >= thresholds.skeptical:
         return "skeptical"
     return "opposed"
 

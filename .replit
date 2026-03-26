@@ -12,6 +12,9 @@ nodejs = "nodejs_20"
 run = ["bash", "run.sh"]
 build = ["bash", "setup.sh"]
 
+[env]
+ELASTICSEARCH_URL = "http://127.0.0.1:9200"
+
 [[ports]]
 localPort = 8000
 externalPort = 80

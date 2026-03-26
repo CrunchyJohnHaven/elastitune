@@ -1,0 +1,16 @@
+import type { EvalCase } from '@/types/contracts';
+
+export const BOOKS_CATALOG_EVAL_SET: EvalCase[] = [
+  { id: "book_eval_001", query: "animal farm orwell allegory", relevantDocIds: ["1", "625"], difficulty: "easy", personaHint: "literature student" },
+  { id: "book_eval_002", query: "dystopian future surveillance totalitarian", relevantDocIds: ["104", "802"], difficulty: "hard", personaHint: "reader" },
+  { id: "book_eval_003", query: "lord of the rings fantasy epic", relevantDocIds: ["79"], difficulty: "easy", personaHint: "fantasy reader" },
+  { id: "book_eval_004", query: "harry potter wizard school magic", relevantDocIds: ["725", "717", "446"], difficulty: "easy", personaHint: "young reader" },
+  { id: "book_eval_005", query: "desert planet chosen one science fiction", relevantDocIds: ["22", "30", "45"], difficulty: "hard", personaHint: "sci-fi fan" },
+  { id: "book_eval_006", query: "pride prejudice austen romance", relevantDocIds: ["66"], difficulty: "easy", personaHint: "classics reader" },
+  { id: "book_eval_007", query: "detective mystery sherlock investigation", relevantDocIds: ["641", "465", "629"], difficulty: "medium", personaHint: "mystery reader" },
+  { id: "book_eval_008", query: "revenge prison escape adventure", relevantDocIds: ["343"], difficulty: "hard", personaHint: "adventure reader" },
+  { id: "book_eval_009", query: "great gatsby american dream jazz age", relevantDocIds: ["321"], difficulty: "medium", personaHint: "literature student" },
+  { id: "book_eval_010", query: "racial injustice small town trial", relevantDocIds: ["309"], difficulty: "hard", personaHint: "book club member" },
+  { id: "book_eval_011", query: "space travel hitchhiker comedy", relevantDocIds: ["226", "285", "174"], difficulty: "medium", personaHint: "sci-fi comedy fan" },
+  { id: "book_eval_012", query: "war military strategy napoleon", relevantDocIds: ["61", "427"], difficulty: "medium", personaHint: "history reader" },
+];

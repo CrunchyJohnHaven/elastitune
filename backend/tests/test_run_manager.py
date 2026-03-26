@@ -37,7 +37,7 @@ def test_evaluate_profile_uses_real_rankings_for_ndcg() -> None:
             auto_stop_on_plateau=True,
         )
 
-        score, misses = await RunManager()._evaluate_profile(
+        score, misses, per_query = await RunManager()._evaluate_profile(
             ctx,
             ctx.baseline_profile,
             es_svc=FakeESService(
@@ -50,6 +50,8 @@ def test_evaluate_profile_uses_real_rankings_for_ndcg() -> None:
 
         assert round(score, 4) == 0.4599
         assert misses == ["serum foundation"]
+        assert round(per_query["eval_001"], 4) == 0.9197
+        assert per_query["eval_002"] == 0.0
 
     asyncio.run(scenario())
 

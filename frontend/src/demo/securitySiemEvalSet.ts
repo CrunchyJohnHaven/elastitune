@@ -1,0 +1,22 @@
+import type { EvalCase } from '@/types/contracts';
+
+export const SECURITY_SIEM_EVAL_SET: EvalCase[] = [
+  { id: 'siem_eval_001', query: 'PowerShell encoded command obfuscation detection', relevantDocIds: ['1', '113', '106'], difficulty: 'easy' },
+  { id: 'siem_eval_002', query: 'ransomware file encryption critical alert', relevantDocIds: ['32', '64', '56'], difficulty: 'easy' },
+  { id: 'siem_eval_003', query: 'APT29 nation-state government supply chain attack', relevantDocIds: ['51', '57', '58'], difficulty: 'medium' },
+  { id: 'siem_eval_004', query: 'credential dumping LSASS mimikatz windows', relevantDocIds: ['3', '9', '102'], difficulty: 'easy' },
+  { id: 'siem_eval_005', query: 'Log4j Log4Shell CVE-2021-44228 remote code execution java', relevantDocIds: ['71', '62'], difficulty: 'easy' },
+  { id: 'siem_eval_006', query: 'lateral movement SMB PsExec remote execution internal network', relevantDocIds: ['4', '107', '109'], difficulty: 'medium' },
+  { id: 'siem_eval_007', query: 'insider threat employee data theft unauthorized access', relevantDocIds: ['72', '86', '76'], difficulty: 'medium' },
+  { id: 'siem_eval_008', query: 'DNS tunneling exfiltration covert channel', relevantDocIds: ['15', '2', '116'], difficulty: 'hard' },
+  { id: 'siem_eval_009', query: 'Exchange Server ProxyShell vulnerability exploit chain', relevantDocIds: ['72', '66'], difficulty: 'easy' },
+  { id: 'siem_eval_010', query: 'kubernetes container escape privilege escalation cloud', relevantDocIds: ['49', '88'], difficulty: 'medium' },
+  { id: 'siem_eval_011', query: 'brute force authentication password spraying active directory', relevantDocIds: ['31', '42', '17'], difficulty: 'easy' },
+  { id: 'siem_eval_012', query: 'cobalt strike beacon C2 post-exploitation', relevantDocIds: ['27', '41', '114'], difficulty: 'medium' },
+  { id: 'siem_eval_013', query: 'supply chain software update compromise backdoor', relevantDocIds: ['71', '81', '90', '51'], difficulty: 'hard' },
+  { id: 'siem_eval_014', query: 'cloud AWS misconfiguration S3 bucket public exposure', relevantDocIds: ['74', '91'], difficulty: 'medium' },
+  { id: 'siem_eval_015', query: 'phishing spearphishing email macro office initial access', relevantDocIds: ['12', '33', '108', '118'], difficulty: 'easy' },
+  { id: 'siem_eval_016', query: 'zero-day vulnerability exploitation in the wild', relevantDocIds: ['80', '120', '125', '130'], difficulty: 'hard' },
+  { id: 'siem_eval_017', query: 'Emotet TrickBot botnet malware distribution campaign', relevantDocIds: ['52', '35'], difficulty: 'medium' },
+  { id: 'siem_eval_018', query: 'critical infrastructure ICS SCADA industrial control system attack', relevantDocIds: ['67', '96'], difficulty: 'hard' },
+];

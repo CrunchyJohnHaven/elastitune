@@ -55,6 +55,22 @@ class FakeESService:
         return None
 
 
+class FakeBenchmarkESService(FakeESService):
+    async def get_mapping(self, index: str):
+        if index == "products-catalog":
+            return {index: {"mappings": {"properties": {"name": {"type": "text"}}}}}
+        if index == "books-catalog":
+            return {index: {"mappings": {"properties": {"title": {"type": "text"}}}}}
+        raise ValueError(f"Index '{index}' not found")
+
+    async def count_docs(self, index: str) -> int:
+        if index == "products-catalog":
+            return 931
+        if index == "books-catalog":
+            return 1200
+        return 0
+
+
 class FakeLLMService:
     def __init__(self, config):
         self.available = False
@@ -94,3 +110,20 @@ def test_live_connect_uses_uploaded_eval_set_for_baseline_count() -> None:
     assert body["summary"]["baselineReady"] is True
     assert body["summary"]["docCount"] == 931
     assert body["summary"]["indexName"] == "products-catalog"
+
+
+def test_benchmark_health_reports_ready_and_setup_required() -> None:
+    with patch("backend.services.es_service.ESService", FakeBenchmarkESService):
+        with TestClient(app) as client:
+            response = client.get("/api/connect/benchmarks")
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["reachable"] is True
+    presets = {preset["indexName"]: preset for preset in body["presets"]}
+    assert presets["products-catalog"]["ready"] is True
+    assert presets["products-catalog"]["docCount"] == 931
+    assert presets["books-catalog"]["ready"] is False
+    assert presets["books-catalog"]["docCount"] == 1200
+    assert presets["books-catalog"]["setupCommand"] == "python benchmarks/setup.py --only books-catalog"
+    assert presets["workplace-docs"]["ready"] is False

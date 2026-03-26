@@ -83,7 +83,7 @@ function ScoreBadge({ value, baseline }: { value: number; baseline?: number }) {
   );
 }
 
-export default function CommitteeRightRail() {
+export default function CommitteeRightRail({ compact = false }: { compact?: boolean }) {
   const snapshot         = useCommitteeStore(state => state.snapshot);
   const selectedPersonaId = useCommitteeStore(state => state.selectedPersonaId);
   const setSelectedPersona = useCommitteeStore(state => state.setSelectedPersona);
@@ -106,13 +106,14 @@ export default function CommitteeRightRail() {
 
   return (
     <div style={{
-      width: 380,
+      width: compact ? '100%' : 380,
       flexShrink: 0,
       background: PANEL_BG,
-      borderLeft: `1px solid ${PANEL_BORDER}`,
+      borderLeft: compact ? 'none' : `1px solid ${PANEL_BORDER}`,
+      borderTop: compact ? `1px solid ${PANEL_BORDER}` : 'none',
       display: 'flex',
       flexDirection: 'column',
-      height: '100%',
+      height: compact ? 'auto' : '100%',
       overflowY: 'auto',
       overflowX: 'hidden',
       scrollbarWidth: 'thin',

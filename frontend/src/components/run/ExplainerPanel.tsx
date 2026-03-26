@@ -3,8 +3,8 @@ import { useAppStore } from '@/store/useAppStore';
 import { PANEL_BORDER, PANEL_BG, ACCENT_BLUE } from '@/lib/theme';
 
 /* ──────────────────────────────────────────────
-   "How It Works" — in-app mission briefing panel
-   Replaces the right rail when toggled.
+   "How It Works" — live results + mission briefing panel
+   Shows real data from the current run.
    ────────────────────────────────────────────── */
 
 function Glyph({ children, color }: { children: string; color: string }) {
@@ -78,32 +78,144 @@ function Section({
   );
 }
 
-function KeyValue({ label, value }: { label: string; value: string }) {
+function ScoreBar({ label, score, maxScore = 1.0 }: { label: string; score: number; maxScore?: number }) {
+  const pct = Math.min((score / maxScore) * 100, 100);
+  const color = score >= 0.8 ? '#4ADE80' : score >= 0.5 ? '#FBBF24' : '#FB7185';
+
   return (
-    <div
-      style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        padding: '4px 0',
-        borderBottom: '1px solid rgba(255,255,255,0.04)',
-      }}
-    >
-      <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: '#6B7480' }}>
-        {label}
-      </span>
-      <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: '#C5CDD8' }}>
-        {value}
-      </span>
+    <div style={{ marginBottom: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+        <span
+          style={{
+            fontFamily: 'Inter, sans-serif',
+            fontSize: 11,
+            color: '#C5CDD8',
+          }}
+        >
+          {label}
+        </span>
+        <span
+          style={{
+            fontFamily: 'JetBrains Mono, monospace',
+            fontSize: 11,
+            fontWeight: 600,
+            color,
+          }}
+        >
+          {score.toFixed(3)}
+        </span>
+      </div>
+      <div
+        style={{
+          height: 4,
+          borderRadius: 2,
+          background: 'rgba(255,255,255,0.06)',
+          overflow: 'hidden',
+        }}
+      >
+        <div
+          style={{
+            height: '100%',
+            width: `${pct}%`,
+            borderRadius: 2,
+            background: color,
+            transition: 'width 0.5s ease',
+          }}
+        />
+      </div>
     </div>
   );
 }
 
 export default function ExplainerPanel() {
   const toggleExplainer = useAppStore(state => state.toggleExplainer);
-  const metrics = useAppStore(state => state.runSnapshot?.metrics);
-  const stage = useAppStore(state => state.runSnapshot?.stage ?? 'idle');
+  const snapshot = useAppStore(state => state.runSnapshot);
+  const metrics = snapshot?.metrics;
+  const stage = snapshot?.stage ?? 'idle';
+  const experiments = snapshot?.experiments ?? [];
+  const summary = snapshot?.summary;
+  const personas = snapshot?.personas ?? [];
+  const searchProfile = snapshot?.searchProfile;
+  const recommendedProfile = snapshot?.recommendedProfile;
+
   const experimentsRun = metrics?.experimentsRun ?? 0;
   const kept = metrics?.improvementsKept ?? 0;
+  const baselineScore = metrics?.baselineScore ?? 0;
+  const bestScore = metrics?.bestScore ?? 0;
+  const improvementPct = metrics?.improvementPct ?? 0;
+  const keptExperiments = experiments.filter(e => e.decision === 'kept');
+
+  // Build a summary of what actually changed
+  const profileChanges: { label: string; from: string; to: string }[] = [];
+  if (searchProfile && recommendedProfile) {
+    if (searchProfile.multiMatchType !== recommendedProfile.multiMatchType) {
+      profileChanges.push({
+        label: 'Match strategy',
+        from: searchProfile.multiMatchType,
+        to: recommendedProfile.multiMatchType,
+      });
+    }
+    // Compare field boosts
+    const baseBoosts = Object.fromEntries(
+      searchProfile.lexicalFields.map(f => [f.field, f.boost])
+    );
+    const bestBoosts = Object.fromEntries(
+      recommendedProfile.lexicalFields.map(f => [f.field, f.boost])
+    );
+    for (const field of Object.keys(bestBoosts)) {
+      const from = baseBoosts[field] ?? 1.0;
+      const to = bestBoosts[field];
+      if (from !== to) {
+        profileChanges.push({
+          label: `${field} boost`,
+          from: String(from),
+          to: String(to),
+        });
+      }
+    }
+    if (searchProfile.tieBreaker !== recommendedProfile.tieBreaker) {
+      profileChanges.push({
+        label: 'Tie breaker',
+        from: String(searchProfile.tieBreaker),
+        to: String(recommendedProfile.tieBreaker),
+      });
+    }
+    if (searchProfile.phraseBoost !== recommendedProfile.phraseBoost) {
+      profileChanges.push({
+        label: 'Phrase boost',
+        from: String(searchProfile.phraseBoost),
+        to: String(recommendedProfile.phraseBoost),
+      });
+    }
+    if (searchProfile.fuzziness !== recommendedProfile.fuzziness) {
+      profileChanges.push({
+        label: 'Fuzziness',
+        from: searchProfile.fuzziness,
+        to: recommendedProfile.fuzziness,
+      });
+    }
+    if (searchProfile.minimumShouldMatch !== recommendedProfile.minimumShouldMatch) {
+      profileChanges.push({
+        label: 'Min should match',
+        from: searchProfile.minimumShouldMatch,
+        to: recommendedProfile.minimumShouldMatch,
+      });
+    }
+  }
+
+  // Get unique persona queries that were tested
+  const sampleQueries = [...new Set(
+    personas
+      .flatMap(p => p.queries ?? [])
+      .filter(q => q && q.length > 0)
+  )].slice(0, 8);
+
+  const indexName = summary?.indexName ?? 'your index';
+  const docCount = summary?.docCount ?? 0;
+  const textFields = summary?.primaryTextFields ?? [];
+  const evalCount = summary?.baselineEvalCount ?? 0;
+  const isPreRun = stage === 'idle' || stage === 'ready' || stage === 'starting' || (experimentsRun === 0 && stage !== 'completed');
+  const panelTitle = isPreRun ? 'How It Works' : stage === 'completed' ? 'What We Found' : 'Live Analysis';
 
   return (
     <div
@@ -131,7 +243,7 @@ export default function ExplainerPanel() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 14 }}>?</span>
+          <span style={{ fontSize: 14 }}>{'\u{1F50D}'}</span>
           <span
             style={{
               fontFamily: 'JetBrains Mono, monospace',
@@ -142,7 +254,7 @@ export default function ExplainerPanel() {
               color: ACCENT_BLUE,
             }}
           >
-            How It Works
+            {panelTitle}
           </span>
         </div>
         <button
@@ -176,131 +288,402 @@ export default function ExplainerPanel() {
           scrollbarColor: 'rgba(255,255,255,0.08) transparent',
         }}
       >
-        {/* Hero narrative */}
+        {isPreRun && (
+          <>
+            <div
+              style={{
+                marginBottom: 24,
+                padding: '16px',
+                background: 'rgba(77,163,255,0.04)',
+                border: '1px solid rgba(77,163,255,0.14)',
+                borderRadius: 8,
+              }}
+            >
+              <p
+                style={{
+                  margin: 0,
+                  fontFamily: 'Inter, sans-serif',
+                  fontSize: 13,
+                  lineHeight: 1.7,
+                  color: '#C5CDD8',
+                }}
+              >
+                ElastiTune starts from your current search setup, runs a controlled benchmark against known-good queries,
+                and only keeps parameter changes that measurably improve ranking quality.
+              </p>
+            </div>
+
+            <Section icon="1" iconColor={ACCENT_BLUE} title="Inspect">
+              ElastiTune reads the index, finds the main searchable fields, samples documents, and builds a benchmark set of realistic test searches.
+            </Section>
+            <Section icon="2" iconColor="#4ADE80" title="Experiment">
+              The optimizer tests one ranking change at a time, measures the impact on the full query set, and immediately reverts anything that hurts results.
+            </Section>
+            <Section icon="3" iconColor="#FBBF24" title="Explain">
+              As the run progresses, this panel switches from the mission briefing to live findings, then ends with the specific changes that helped.
+            </Section>
+          </>
+        )}
+
+        {/* Hero — The Headline Result */}
         <div
           style={{
             marginBottom: 24,
-            padding: '14px',
-            background: 'rgba(77,163,255,0.04)',
-            border: `1px solid rgba(77,163,255,0.15)`,
+            padding: '16px',
+            background: improvementPct > 5
+              ? 'rgba(74,222,128,0.06)'
+              : 'rgba(77,163,255,0.04)',
+            border: `1px solid ${
+              improvementPct > 5
+                ? 'rgba(74,222,128,0.2)'
+                : 'rgba(77,163,255,0.15)'
+            }`,
             borderRadius: 8,
           }}
         >
-          <p
-            style={{
-              fontFamily: 'Inter, sans-serif',
-              fontSize: 13,
-              lineHeight: 1.7,
-              color: '#C5CDD8',
-              margin: 0,
-            }}
-          >
-            ElastiTune is <strong style={{ color: '#EEF3FF' }}>optimizing your search engine in real time</strong>.
-            It runs dozens of A/B experiments against your Elasticsearch index, testing different
-            configuration tweaks, and keeps only the changes that measurably improve search quality.
-          </p>
+          {improvementPct > 1 ? (
+            <>
+              <div
+                style={{
+                  fontFamily: 'Inter, sans-serif',
+                  fontSize: 22,
+                  fontWeight: 700,
+                  color: '#4ADE80',
+                  marginBottom: 6,
+                }}
+              >
+                +{improvementPct.toFixed(1)}% improvement
+              </div>
+              <p
+                style={{
+                  fontFamily: 'Inter, sans-serif',
+                  fontSize: 13,
+                  lineHeight: 1.6,
+                  color: '#C5CDD8',
+                  margin: 0,
+                }}
+              >
+                ElastiTune improved search quality on{' '}
+                <strong style={{ color: '#EEF3FF' }}>{indexName}</strong> ({docCount.toLocaleString()} docs)
+                from <span style={{ color: '#FB7185', fontFamily: 'JetBrains Mono, monospace', fontSize: 12 }}>{baselineScore.toFixed(3)}</span> to{' '}
+                <span style={{ color: '#4ADE80', fontFamily: 'JetBrains Mono, monospace', fontSize: 12 }}>{bestScore.toFixed(3)}</span> nDCG@10
+                across {evalCount} test queries.
+              </p>
+            </>
+          ) : stage === 'running' ? (
+            <p
+              style={{
+                fontFamily: 'Inter, sans-serif',
+                fontSize: 13,
+                lineHeight: 1.7,
+                color: '#C5CDD8',
+                margin: 0,
+              }}
+            >
+              ElastiTune is <strong style={{ color: '#EEF3FF' }}>optimizing {indexName}</strong> in real time,
+              testing different search configurations against {evalCount} test queries
+              to find measurable improvements.
+            </p>
+          ) : null}
         </div>
 
-        {/* What's happening right now */}
-        <Section icon="1" iconColor={ACCENT_BLUE} title="What's Happening Right Now">
-          {stage === 'running' ? (
-            <>
-              The optimizer has run <strong style={{ color: '#EEF3FF' }}>{experimentsRun} experiments</strong> so
-              far. Each one tests a specific change — like boosting title matches, adding phrase matching,
-              or adjusting how many words need to match. Of those, <strong style={{ color: '#4ADE80' }}>{kept} improved
-              results</strong> and were kept. The rest were reverted.
-            </>
-          ) : stage === 'completed' ? (
-            <>
-              Optimization is <strong style={{ color: '#4ADE80' }}>complete</strong>. The optimizer
-              ran {experimentsRun} experiments and found {kept} improvements. View the report
-              for the full recommended configuration.
-            </>
-          ) : (
-            <>
-              Waiting for the optimization run to begin. Once started, you'll see experiments
-              stream in here in real time.
-            </>
-          )}
-        </Section>
+        {/* Score comparison */}
+        {!isPreRun && baselineScore > 0 && (
+          <Section icon="1" iconColor={ACCENT_BLUE} title="Search Quality Score">
+            <ScoreBar label="Baseline (before)" score={baselineScore} />
+            <ScoreBar label={stage === 'running' ? 'Current best' : 'After optimization'} score={bestScore} />
+            <div
+              style={{
+                marginTop: 6,
+                fontFamily: 'Inter, sans-serif',
+                fontSize: 11,
+                color: '#6B7480',
+                lineHeight: 1.5,
+              }}
+            >
+              <strong style={{ color: '#EEF3FF' }}>nDCG@10</strong> measures whether the most relevant
+              documents appear in the top 10 results. 1.0 = perfect ranking. Tested against {evalCount} real queries.
+            </div>
+          </Section>
+        )}
 
-        {/* The Visualization */}
-        <Section icon="2" iconColor="#7CE7FF" title="The Visualization">
-          Each <strong style={{ color: '#EEF3FF' }}>colored dot</strong> is a simulated user persona
-          — a SOC Analyst, a CISO, a Threat Hunter — each with their own typical search queries.
-          When a dot <strong style={{ color: '#4DA3FF' }}>fires a beam</strong> toward the center,
-          that persona is running a search against the current configuration.{' '}
-          <strong style={{ color: '#4ADE80' }}>Green flashes</strong> mean they found what they needed.{' '}
-          <strong style={{ color: '#FB7185' }}>Red</strong> means they didn't.{' '}
-          <strong style={{ color: '#FBBF24' }}>Amber</strong> means partial results.
-          <br /><br />
-          The <strong style={{ color: '#EEF3FF' }}>wave ripples</strong> from the center indicate an
-          experiment was just evaluated — green for kept, red for reverted.
-          <strong style={{ color: '#9AA4B2' }}> Floating query text</strong> shows the actual searches
-          being tested.
-        </Section>
+        {/* What Changed — Tangible Profile Diffs */}
+        {!isPreRun && profileChanges.length > 0 && (
+          <Section icon="2" iconColor="#4ADE80" title="What We Changed">
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 6,
+                marginBottom: 8,
+              }}
+            >
+              {profileChanges.map((change, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '6px 8px',
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.06)',
+                    borderRadius: 6,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontFamily: 'Inter, sans-serif',
+                      fontSize: 11,
+                      color: '#9AA4B2',
+                      flex: 1,
+                    }}
+                  >
+                    {change.label}
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: 'JetBrains Mono, monospace',
+                      fontSize: 10,
+                      color: '#FB7185',
+                    }}
+                  >
+                    {change.from}
+                  </span>
+                  <span style={{ fontSize: 10, color: '#4B5563' }}>{'\u2192'}</span>
+                  <span
+                    style={{
+                      fontFamily: 'JetBrains Mono, monospace',
+                      fontSize: 10,
+                      color: '#4ADE80',
+                      fontWeight: 600,
+                    }}
+                  >
+                    {change.to}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, color: '#6B7480', lineHeight: 1.5 }}>
+              {profileChanges.some(c => c.label.includes('boost'))
+                ? 'Field boost changes reweight which text fields matter most for ranking. A lower boost on a noisy field (like description) reduces irrelevant matches.'
+                : 'These configuration changes directly affect how Elasticsearch ranks search results.'}
+            </div>
+          </Section>
+        )}
 
-        {/* Experiment Stream */}
-        <Section icon="3" iconColor="#4ADE80" title="Experiment Stream (Left Panel)">
-          Every row is one optimization attempt. The system generates a{' '}
-          <strong style={{ color: '#EEF3FF' }}>hypothesis</strong> (e.g., "Stronger title weighting will help
-          exact incident lookups"), makes the change, evaluates it against{' '}
-          <strong style={{ color: '#EEF3FF' }}>127 test queries</strong>, and either keeps or reverts it.
-          <br /><br />
-          <span style={{ color: '#4ADE80' }}>KEPT</span> = search quality improved.{' '}
-          <span style={{ color: '#FB7185' }}>REVERTED</span> = it made things worse.
-        </Section>
+        {/* Kept Experiments — What Actually Worked */}
+        {!isPreRun && keptExperiments.length > 0 && (
+          <Section icon="3" iconColor="#7CE7FF" title="Experiments That Worked">
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 6,
+                marginBottom: 8,
+              }}
+            >
+              {keptExperiments.slice(-5).map((exp) => (
+                <div
+                  key={exp.experimentId}
+                  style={{
+                    padding: '8px 10px',
+                    background: 'rgba(74,222,128,0.04)',
+                    border: '1px solid rgba(74,222,128,0.12)',
+                    borderRadius: 6,
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    <span
+                      style={{
+                        fontFamily: 'JetBrains Mono, monospace',
+                        fontSize: 9,
+                        color: '#6B7480',
+                      }}
+                    >
+                      Experiment #{exp.experimentId}
+                    </span>
+                    <span
+                      style={{
+                        fontFamily: 'JetBrains Mono, monospace',
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: '#4ADE80',
+                      }}
+                    >
+                      +{exp.deltaPercent.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: 'Inter, sans-serif',
+                      fontSize: 11,
+                      color: '#C5CDD8',
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    {exp.hypothesis}
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: 'JetBrains Mono, monospace',
+                      fontSize: 10,
+                      color: '#6B7480',
+                      marginTop: 3,
+                    }}
+                  >
+                    {exp.baselineScore.toFixed(4)} {'\u2192'} {exp.candidateScore.toFixed(4)} nDCG@10
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
 
-        {/* How Quality Is Measured */}
-        <Section icon="4" iconColor="#FBBF24" title="How Quality Is Measured">
-          <strong style={{ color: '#EEF3FF' }}>nDCG@10</strong> (Normalized Discounted Cumulative Gain)
-          is the gold standard for ranking quality. It measures: <em>"Are the most relevant documents
-          appearing in the top 10 results, in the right order?"</em>
-          <br /><br />
-          A score of <span style={{ color: '#FB7185' }}>0.41</span> means search results are mediocre — relevant
-          docs exist but aren't surfacing well. A score of <span style={{ color: '#4ADE80' }}>0.55+</span> means
-          significantly better ranking — the right answers are consistently near the top.
-        </Section>
+        {/* What We Tested */}
+        {!isPreRun && sampleQueries.length > 0 && (
+          <Section icon="4" iconColor="#FBBF24" title="Test Queries Used">
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 5,
+                marginBottom: 8,
+              }}
+            >
+              {sampleQueries.map((q, i) => (
+                <span
+                  key={i}
+                  style={{
+                    fontFamily: 'JetBrains Mono, monospace',
+                    fontSize: 10,
+                    color: '#C5CDD8',
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: 4,
+                    padding: '3px 8px',
+                  }}
+                >
+                  "{q}"
+                </span>
+              ))}
+            </div>
+            <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, color: '#6B7480', lineHeight: 1.5 }}>
+              Each experiment is evaluated against {evalCount > 0 ? `all ${evalCount}` : 'these'} queries.
+              We compare the full ranked results against known relevant documents and compute nDCG@10.
+            </div>
+          </Section>
+        )}
 
-        {/* What Gets Tuned */}
-        <Section icon="5" iconColor="#A78BFA" title="What Gets Tuned">
-          The optimizer explores a parameter space including:
-          <div style={{ marginTop: 8 }}>
-            <KeyValue label="Field boosts" value="title, message, description" />
-            <KeyValue label="Match type" value="best_fields, cross_fields, phrase" />
-            <KeyValue label="Phrase boost" value="0.0 → 3.0" />
-            <KeyValue label="Minimum match" value="50% → 100%" />
-            <KeyValue label="Fuzziness" value="OFF / AUTO" />
-            <KeyValue label="Tie breaker" value="0.0 → 1.0" />
-            <KeyValue label="Lexical/vector weight" value="0.0 → 1.0" />
-            <KeyValue label="Vector candidates" value="50 → 500" />
-            <KeyValue label="RRF rank constant" value="1 → 100" />
+        {/* Fields being searched */}
+        {!isPreRun && textFields.length > 0 && (
+          <Section icon="5" iconColor="#A78BFA" title="Fields Being Searched">
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 4,
+                marginBottom: 8,
+              }}
+            >
+              {(recommendedProfile?.lexicalFields ?? searchProfile?.lexicalFields ?? []).map((f, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '5px 8px',
+                    background: 'rgba(255,255,255,0.03)',
+                    borderRadius: 5,
+                    border: '1px solid rgba(255,255,255,0.05)',
+                  }}
+                >
+                  <span
+                    style={{
+                      fontFamily: 'JetBrains Mono, monospace',
+                      fontSize: 11,
+                      color: '#EEF3FF',
+                    }}
+                  >
+                    {f.field}
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: 'JetBrains Mono, monospace',
+                      fontSize: 11,
+                      color: '#7CE7FF',
+                      fontWeight: 600,
+                    }}
+                  >
+                    {f.boost}x
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, color: '#6B7480', lineHeight: 1.5 }}>
+              Higher boost = more weight in ranking. ElastiTune finds the optimal weight for each field so
+              relevant documents rank higher.
+            </div>
+          </Section>
+        )}
+
+        {/* Run progress */}
+        {!isPreRun && (
+        <Section icon="6" iconColor="#FB7185" title="Optimization Progress">
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: 6,
+              marginBottom: 8,
+            }}
+          >
+            {[
+              { label: 'Experiments run', value: String(experimentsRun), color: '#EEF3FF' },
+              { label: 'Improvements kept', value: String(kept), color: '#4ADE80' },
+              { label: 'Reverted', value: String(experimentsRun - kept), color: '#FB7185' },
+              { label: 'Success rate', value: kept > 0 ? `${((kept / Math.max(experimentsRun, 1)) * 100).toFixed(0)}%` : '—', color: '#FBBF24' },
+            ].map((stat, i) => (
+              <div
+                key={i}
+                style={{
+                  padding: '8px',
+                  background: 'rgba(255,255,255,0.02)',
+                  border: '1px solid rgba(255,255,255,0.05)',
+                  borderRadius: 6,
+                }}
+              >
+                <div
+                  style={{
+                    fontFamily: 'JetBrains Mono, monospace',
+                    fontSize: 9,
+                    color: '#6B7480',
+                    marginBottom: 2,
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  {stat.label}
+                </div>
+                <div
+                  style={{
+                    fontFamily: 'Inter, sans-serif',
+                    fontSize: 16,
+                    fontWeight: 700,
+                    color: stat.color,
+                  }}
+                >
+                  {stat.value}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, color: '#6B7480', lineHeight: 1.5 }}>
+            ElastiTune uses greedy hill-climbing: it makes one change at a time, keeps it only if nDCG improves,
+            and reverts otherwise. This avoids overfitting while finding real gains.
           </div>
         </Section>
-
-        {/* Under the Hood */}
-        <Section icon="6" iconColor="#FB7185" title="Under the Hood">
-          ElastiTune uses a <strong style={{ color: '#EEF3FF' }}>greedy hill-climbing optimizer</strong>.
-          Starting from the current search configuration, it makes one change at a time, measures the
-          effect, and keeps the change only if nDCG@10 improves by at least +0.3%. This conservative
-          approach avoids overfitting while still finding significant gains.
-          <br /><br />
-          Each experiment takes the full evaluation set, runs both the baseline and candidate queries,
-          computes nDCG@10 for each, and compares. No training data is needed — just the index itself.
-        </Section>
-
-        {/* Personas */}
-        <Section icon="7" iconColor="#F472B6" title="The Personas">
-          The 24 personas represent different user archetypes that would search this index in
-          real life. Each has their own set of typical queries and success criteria. For a security
-          index: a <strong style={{ color: '#EEF3FF' }}>SOC Analyst</strong> searches for specific
-          CVE IDs, a <strong style={{ color: '#EEF3FF' }}>Threat Hunter</strong> looks for lateral
-          movement patterns, a <strong style={{ color: '#EEF3FF' }}>CISO</strong> wants executive
-          risk summaries.
-          <br /><br />
-          As the optimizer improves the search configuration, you'll see persona success rates climb
-          — the right results start appearing for everyone's queries, not just a few.
-        </Section>
+        )}
 
         {/* Bottom */}
         <div
@@ -321,7 +704,7 @@ export default function ExplainerPanel() {
               letterSpacing: '0.06em',
             }}
           >
-            Built with ElastiTune — Autonomous Search Optimization
+            ElastiTune — Autonomous Search Optimization for Elasticsearch
           </span>
         </div>
       </div>

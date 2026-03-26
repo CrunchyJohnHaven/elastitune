@@ -37,18 +37,18 @@ def build_lexical_query(query_text: str, profile: SearchProfile, size: int = 50)
         f"{f['field']}^{f['boost']}" for f in profile.lexicalFields
     ]
 
-    should_clauses = [
-        {
-            "multi_match": {
-                "query": query_text,
-                "type": profile.multiMatchType,
-                "fields": fields_with_boosts,
-                "minimum_should_match": profile.minimumShouldMatch,
-                "tie_breaker": profile.tieBreaker,
-                "fuzziness": profile.fuzziness,
-            }
-        }
-    ]
+    mm_clause = {
+        "query": query_text,
+        "type": profile.multiMatchType,
+        "fields": fields_with_boosts,
+        "minimum_should_match": profile.minimumShouldMatch,
+        "tie_breaker": profile.tieBreaker,
+    }
+    # cross_fields does not support fuzziness in Elasticsearch
+    if profile.multiMatchType != "cross_fields" and profile.fuzziness != "0":
+        mm_clause["fuzziness"] = profile.fuzziness
+
+    should_clauses = [{"multi_match": mm_clause}]
 
     if profile.phraseBoost > 0:
         should_clauses.append({
@@ -132,6 +132,34 @@ class Evaluator:
 
         mean_ndcg = sum(ndcg_scores) / len(ndcg_scores) if ndcg_scores else 0.0
         return mean_ndcg, failures
+
+    async def evaluate_detailed(self, profile: SearchProfile, eval_set: List[EvalCase]) -> Tuple[float, List[str], Dict[str, float]]:
+        """Run evaluation with per-query scores. Returns (mean_ndcg10, failures, {queryId: score})."""
+        if not eval_set:
+            return 0.0, [], {}
+
+        ndcg_scores = []
+        failures = []
+        per_query: Dict[str, float] = {}
+
+        for case in eval_set:
+            try:
+                query = build_lexical_query(case.query, profile, size=50)
+                result = await self.es.search(self.summary.indexName, query)
+                hits = result.get("hits", {}).get("hits", [])
+                ranked_ids = [h["_id"] for h in hits]
+                ndcg = compute_ndcg(ranked_ids, case.relevantDocIds)
+                ndcg_scores.append(ndcg)
+                per_query[case.id] = ndcg
+                if ndcg < 0.1:
+                    failures.append(case.query)
+            except Exception:
+                ndcg_scores.append(0.0)
+                per_query[case.id] = 0.0
+                failures.append(case.query)
+
+        mean_ndcg = sum(ndcg_scores) / len(ndcg_scores) if ndcg_scores else 0.0
+        return mean_ndcg, failures, per_query
 
     async def evaluate_demo(self, profile: SearchProfile, eval_set: List[EvalCase]) -> Tuple[float, List[str]]:
         """Demo mode evaluation - simulate scores based on profile quality."""

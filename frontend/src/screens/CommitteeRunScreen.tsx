@@ -7,20 +7,30 @@ import CommitteeLeftRail from '@/components/committee/CommitteeLeftRail';
 import CommitteeSpaceCanvas from '@/components/committee/CommitteeSpaceCanvas';
 import CommitteeRightRail from '@/components/committee/CommitteeRightRail';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import { useToast } from '@/components/ui/ToastProvider';
 import { useCommitteeRunSocket } from '@/hooks/useCommitteeRunSocket';
+import { useViewportWidth } from '@/hooks/useViewportWidth';
 import { useCommitteeStore } from '@/store/useCommitteeStore';
 import { api } from '@/lib/api';
+import { formatPercent, formatScore } from '@/lib/format';
 
 export default function CommitteeRunScreen() {
   const { runId } = useParams<{ runId: string }>();
   const navigate = useNavigate();
+  const toast = useToast();
+  const width = useViewportWidth();
   const snapshot = useCommitteeStore(state => state.snapshot);
+  const report = useCommitteeStore(state => state.report);
   const socketStatus = useCommitteeStore(state => state.socketStatus);
   const [loadingTimedOut, setLoadingTimedOut] = useState(false);
   const [stopLoading, setStopLoading] = useState(false);
   const [stopError, setStopError] = useState<string | null>(null);
+  const [showStopConfirm, setShowStopConfirm] = useState(false);
 
   useCommitteeRunSocket(runId ?? null);
+
+  const isCompact = width < 1320;
 
   useEffect(() => {
     if (snapshot) {
@@ -42,12 +52,19 @@ export default function CommitteeRunScreen() {
     setStopError(null);
     try {
       await api.stopCommitteeRun(runId);
+      toast.info('Stopping committee run…');
     } catch (error) {
-      setStopError(error instanceof Error ? error.message : 'Failed to stop committee run');
+      const message = error instanceof Error ? error.message : 'Failed to stop committee run';
+      setStopError(message);
+      toast.error(message);
     } finally {
       setStopLoading(false);
     }
   };
+
+  const stopDescription = snapshot
+    ? `Current consensus is ${formatScore(snapshot.metrics.currentScore)} (${formatPercent(snapshot.metrics.improvementPct)} from baseline). ${snapshot.metrics.rewritesTested}/${Math.max(snapshot.metrics.rewritesTested, 30)} rewrites have run so far.`
+    : 'The run will stop and keep the results gathered so far.';
 
   return (
     <ErrorBoundary title="Committee Run Failed">
@@ -126,10 +143,18 @@ export default function CommitteeRunScreen() {
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.45, ease: 'easeOut' }}
-            style={{ flex: 1, display: 'grid', gridTemplateColumns: '320px 1fr 360px', height: 0, overflow: 'hidden' }}
+            style={{
+              flex: 1,
+              display: 'grid',
+              gridTemplateColumns: isCompact ? 'minmax(0, 1fr)' : '320px minmax(0, 1fr) 360px',
+              gridTemplateRows: isCompact ? 'minmax(420px, 60vh) auto auto' : '1fr',
+              height: isCompact ? 'auto' : 0,
+              minHeight: 0,
+              overflow: isCompact ? 'auto' : 'hidden',
+            }}
           >
-            <CommitteeLeftRail />
-            <div style={{ position: 'relative', background: '#05070B' }}>
+            {!isCompact && <CommitteeLeftRail />}
+            <div style={{ position: 'relative', background: '#05070B', minHeight: isCompact ? 420 : 0 }}>
               <CommitteeSpaceCanvas />
               {warningMessages.length > 0 && (
                 <div style={{ position: 'absolute', top: 18, left: 18, zIndex: 5, maxWidth: 440 }}>
@@ -178,13 +203,13 @@ export default function CommitteeRunScreen() {
                   New Committee
                 </Link>
                 <button
-                  onClick={handleStop}
+                  onClick={() => setShowStopConfirm(true)}
                   disabled={stopLoading || snapshot.stage === 'completed' || snapshot.stage === 'stopping'}
                   style={{ padding: '8px 12px', borderRadius: 10, background: 'rgba(251,113,133,0.12)', border: '1px solid rgba(251,113,133,0.22)', color: '#FB7185', fontSize: 12, fontFamily: 'Inter, sans-serif', cursor: stopLoading ? 'not-allowed' : 'pointer', opacity: stopLoading ? 0.7 : 1 }}
                 >
                   {stopLoading || snapshot.stage === 'stopping' ? 'Stopping…' : 'Stop Run'}
                 </button>
-                {snapshot.stage === 'completed' && runId && (
+                {(snapshot.stage === 'completed' || report) && runId && (
                   <button
                     onClick={() => navigate(`/committee/report/${runId}`)}
                     style={{ padding: '8px 12px', borderRadius: 10, background: 'rgba(74,222,128,0.12)', border: '1px solid rgba(74,222,128,0.22)', color: '#4ADE80', fontSize: 12, fontFamily: 'Inter, sans-serif', cursor: 'pointer' }}
@@ -199,10 +224,24 @@ export default function CommitteeRunScreen() {
                 </div>
               )}
             </div>
-            <CommitteeRightRail />
+            {isCompact && <CommitteeLeftRail compact />}
+            <CommitteeRightRail compact={isCompact} />
           </motion.div>
         )}
       </ShellFrame>
+      <ConfirmDialog
+        open={showStopConfirm}
+        title="Stop this committee run?"
+        description={stopDescription}
+        confirmLabel="Stop Run"
+        confirmColor="#FB7185"
+        cancelLabel="Keep Running"
+        onConfirm={() => {
+          setShowStopConfirm(false);
+          void handleStop();
+        }}
+        onCancel={() => setShowStopConfirm(false)}
+      />
     </ErrorBoundary>
   );
 }

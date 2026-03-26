@@ -3,7 +3,7 @@ import { useCommitteeStore } from '@/store/useCommitteeStore';
 import { formatPercent, formatScore, formatTimestamp, truncate } from '@/lib/format';
 import { PANEL_BG, PANEL_BORDER } from '@/lib/theme';
 
-export default function CommitteeLeftRail() {
+export default function CommitteeLeftRail({ compact = false }: { compact?: boolean }) {
   const rewrites = useCommitteeStore(state => state.snapshot?.rewrites ?? []);
   const metrics = useCommitteeStore(state => state.snapshot?.metrics);
   const list = rewrites.slice(-24).reverse();
@@ -11,12 +11,13 @@ export default function CommitteeLeftRail() {
   return (
     <div
       style={{
-        width: 340,
+        width: compact ? '100%' : 340,
         background: PANEL_BG,
-        borderRight: `1px solid ${PANEL_BORDER}`,
+        borderRight: compact ? 'none' : `1px solid ${PANEL_BORDER}`,
+        borderTop: compact ? `1px solid ${PANEL_BORDER}` : 'none',
         display: 'flex',
         flexDirection: 'column',
-        overflow: 'hidden',
+        overflow: compact ? 'visible' : 'hidden',
       }}
     >
       <div style={{ padding: '12px 14px', borderBottom: `1px solid ${PANEL_BORDER}` }}>
@@ -108,4 +109,3 @@ export default function CommitteeLeftRail() {
     </div>
   );
 }
-

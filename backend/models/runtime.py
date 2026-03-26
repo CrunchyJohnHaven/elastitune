@@ -75,3 +75,7 @@ class RunContext:
         self.started_at: Optional[str] = None
         self.completed_at: Optional[str] = None
         self._best_score: float = 0.0
+        self.previous_run_id: Optional[str] = None  # Set when continuing from a previous run
+        self.prior_experiments: List[ExperimentRecord] = []
+        self.per_query_scores: Dict[str, Dict[str, float]] = {}  # {queryId: {"baseline": x, "best": y}}
+        self.per_query_results: Dict[str, Dict[str, List[Dict[str, Any]]]] = {}

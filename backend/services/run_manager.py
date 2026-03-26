@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections import deque
 import logging
 import math
 import random
@@ -29,9 +30,10 @@ from ..models.report import ReportPayload
 from ..committee.evaluator import CommitteeEvaluator
 from ..committee.models import CommitteeSnapshot, CommitteePersonaView, RewriteAttempt, ScoreTimelinePoint
 from ..committee.reporting import build_export_payload, build_report
-from ..committee.rewrite_engine import CommitteeRewriteEngine
+from ..committee.rewrite_engine import BASE_PARAMETER_VALUES, CommitteeRewriteEngine
 from ..committee.runtime import CommitteeConnectionContext, CommitteeRunContext
 from ..config import settings
+from ..engine.optimizer_search_space import generate_security_field_mutations
 from .persistence_service import PersistenceService
 from .report_service import ReportService
 
@@ -74,7 +76,33 @@ class RunManager:
             )
 
     async def get_connection(self, connection_id: str) -> Optional[ConnectionContext]:
-        return self.connections.get(connection_id)
+        ctx = self.connections.get(connection_id)
+        if ctx is not None:
+            return ctx
+        if not self.persistence:
+            return None
+
+        payload = await self.persistence.load_connection(connection_id)
+        if not payload:
+            return None
+
+        restored = ConnectionContext(
+            connection_id=payload["connection_id"],
+            mode=payload["mode"],
+            summary=ConnectionSummary.model_validate(payload["summary"]),
+            eval_set=[EvalCase.model_validate(case) for case in payload.get("eval_set", [])],
+            baseline_profile=SearchProfile.model_validate(payload["baseline_profile"]),
+            llm_config=LlmConfig.model_validate(payload["llm_config"])
+            if payload.get("llm_config")
+            else None,
+            es_url=payload.get("es_url"),
+            api_key=payload.get("api_key"),
+            index_name=payload.get("index_name"),
+            text_fields=payload.get("text_fields"),
+            sample_docs=payload.get("sample_docs"),
+        )
+        self.connections[connection_id] = restored
+        return restored
 
     async def create_committee_connection(
         self,
@@ -129,6 +157,12 @@ class RunManager:
             experiments=ctx.experiments,
             compression=ctx.compression,
             warnings=ctx.warnings,
+            runConfig={
+                "durationMinutes": ctx.duration_minutes,
+                "maxExperiments": ctx.max_experiments,
+                "personaCount": len(ctx.personas),
+                "autoStopOnPlateau": ctx.auto_stop_on_plateau,
+            },
             startedAt=ctx.started_at,
             completedAt=ctx.completed_at,
         )
@@ -304,7 +338,7 @@ class RunManager:
             llm_svc = LLMService(ctx.llm_config)
 
         plateau_count = 0
-        max_plateau = 5
+        max_plateau = 15
         es_svc: Optional[ESService] = None
         if ctx.es_url:
             es_svc = ESService(es_url=ctx.es_url, api_key=ctx.api_key or None)
@@ -312,7 +346,7 @@ class RunManager:
         try:
             # Evaluate baseline
             try:
-                baseline_score, baseline_failures = await self._evaluate_profile(
+                baseline_score, baseline_failures, baseline_per_query = await self.evaluate_detailed(
                     ctx,
                     ctx.baseline_profile,
                     es_svc=es_svc,
@@ -322,6 +356,19 @@ class RunManager:
                 ctx.metrics.bestScore = baseline_score
                 ctx._best_score = baseline_score
                 ctx._current_query_failures = baseline_failures
+                # Track per-query baseline scores
+                for qid, qscore in baseline_per_query.items():
+                    ctx.per_query_scores[qid] = {"baseline": qscore, "best": qscore}
+                baseline_previews = await self._collect_query_result_previews(
+                    ctx,
+                    ctx.baseline_profile,
+                    es_svc=es_svc,
+                )
+                for qid, previews in baseline_previews.items():
+                    ctx.per_query_results[qid] = {
+                        "baseline": previews,
+                        "best": previews,
+                    }
             except Exception as exc:
                 logger.error("Baseline evaluation failed: %s", exc)
                 ctx.warnings.append(f"Baseline evaluation failed: {exc}")
@@ -357,7 +404,7 @@ class RunManager:
                     _apply_profile_change(candidate, change)
 
                     t_start = time.monotonic()
-                    candidate_score, candidate_failures = await self._evaluate_profile(
+                    candidate_score, candidate_failures, candidate_per_query = await self.evaluate_detailed(
                         ctx,
                         candidate,
                         es_svc=es_svc,
@@ -377,6 +424,15 @@ class RunManager:
                         if candidate_score > ctx._best_score:
                             ctx._best_score = candidate_score
                             ctx.best_profile = candidate.model_copy(deep=True)
+                            # Update per-query best scores
+                            for qid, qscore in candidate_per_query.items():
+                                if qid in ctx.per_query_scores:
+                                    ctx.per_query_scores[qid]["best"] = max(
+                                        ctx.per_query_scores[qid].get("best", 0.0),
+                                        qscore,
+                                    )
+                                else:
+                                    ctx.per_query_scores[qid] = {"baseline": qscore, "best": qscore}
                         plateau_count = 0
                     else:
                         decision = "reverted"
@@ -385,7 +441,7 @@ class RunManager:
                     record = ExperimentRecord(
                         experimentId=exp_num + 1,
                         timestamp=now_ts(),
-                        hypothesis=change.label,
+                        hypothesis=_hypothesis_text(change),
                         change=change,
                         baselineScore=baseline_for_exp,
                         candidateScore=candidate_score,
@@ -424,11 +480,52 @@ class RunManager:
                     )
                     await self._persist_search_run(run_id)
 
+                    # Pace experiments so the visualization can animate.
+                    # Local ES queries finish in <10ms; without pacing the entire
+                    # run completes before the frontend renders a single frame.
+                    if duration_ms < 500:
+                        await asyncio.sleep(1.8)
+
                 except asyncio.CancelledError:
                     break
                 except Exception as exc:
                     logger.error("Optimizer error at experiment %d: %s", exp_num, exc)
                     await asyncio.sleep(1.0)
+
+            try:
+                final_best_score, final_failures, final_per_query = await self.evaluate_detailed(
+                    ctx,
+                    ctx.best_profile,
+                    es_svc=es_svc,
+                )
+                ctx._best_score = final_best_score
+                ctx.metrics.bestScore = final_best_score
+                ctx.metrics.currentScore = final_best_score
+                ctx.metrics.improvementPct = (
+                    (final_best_score - ctx.metrics.baselineScore)
+                    / max(ctx.metrics.baselineScore, 0.001)
+                ) * 100
+                ctx._current_query_failures = final_failures
+                for qid, qscore in final_per_query.items():
+                    baseline_score = ctx.per_query_scores.get(qid, {}).get("baseline", qscore)
+                    ctx.per_query_scores[qid] = {
+                        "baseline": baseline_score,
+                        "best": qscore,
+                    }
+                best_previews = await self._collect_query_result_previews(
+                    ctx,
+                    ctx.best_profile,
+                    es_svc=es_svc,
+                )
+                for qid, previews in best_previews.items():
+                    existing = ctx.per_query_results.get(qid, {})
+                    ctx.per_query_results[qid] = {
+                        "baseline": existing.get("baseline", previews),
+                        "best": previews,
+                    }
+            except Exception as exc:
+                logger.warning("Final best-profile evaluation failed for run %s: %s", run_id, exc)
+                ctx.warnings.append(f"Final best-profile evaluation failed: {exc}")
         finally:
             if es_svc:
                 await es_svc.close()
@@ -450,23 +547,24 @@ class RunManager:
         ctx: RunContext,
         profile: SearchProfile,
         es_svc: Optional[Any] = None,
-    ) -> Tuple[float, List[str]]:
-        """Evaluate a search profile against the eval set, returning nDCG@10 and missed queries."""
+    ) -> Tuple[float, List[str], Dict[str, float]]:
+        """Evaluate a search profile against the eval set, returning (nDCG@10, missed queries, per-query scores)."""
         if not ctx.eval_set:
-            return 0.5, []
+            return 0.5, [], {}
 
         from .es_service import ESService
 
         close_after = False
         if es_svc is None:
             if not ctx.es_url or not ctx.index_name:
-                return 0.0, [case.query for case in ctx.eval_set]
+                return 0.0, [case.query for case in ctx.eval_set], {}
             es_svc = ESService(es_url=ctx.es_url, api_key=ctx.api_key or None)
             close_after = True
 
         total_ndcg = 0.0
         evaluated = 0
         missed_queries: List[str] = []
+        per_query_scores: Dict[str, float] = {}
 
         try:
             for case in ctx.eval_set:
@@ -487,13 +585,60 @@ class RunManager:
                 ndcg = self._compute_ndcg_at_k(case.relevantDocIds, ranked_doc_ids, k=10)
                 total_ndcg += ndcg
                 evaluated += 1
+                per_query_scores[case.id] = ndcg
                 if ndcg == 0:
                     missed_queries.append(case.query)
         finally:
             if close_after:
                 await es_svc.close()
 
-        return total_ndcg / max(evaluated, 1), missed_queries
+        mean_score = total_ndcg / max(evaluated, 1)
+        return mean_score, missed_queries, per_query_scores
+
+    async def evaluate_detailed(
+        self,
+        ctx: RunContext,
+        profile: SearchProfile,
+        es_svc: Optional[Any] = None,
+    ) -> Tuple[float, List[str], Dict[str, float]]:
+        return await self._evaluate_profile(ctx, profile, es_svc=es_svc)
+
+    async def _collect_query_result_previews(
+        self,
+        ctx: RunContext,
+        profile: SearchProfile,
+        es_svc: Optional[Any] = None,
+    ) -> Dict[str, List[Dict[str, Any]]]:
+        if not ctx.eval_set:
+            return {}
+
+        from .es_service import ESService
+
+        close_after = False
+        if es_svc is None:
+            if not ctx.es_url or not ctx.index_name:
+                return {}
+            es_svc = ESService(es_url=ctx.es_url, api_key=ctx.api_key or None)
+            close_after = True
+
+        previews: Dict[str, List[Dict[str, Any]]] = {}
+        try:
+            for case in ctx.eval_set:
+                try:
+                    previews[case.id] = await es_svc.execute_profile_query_with_hits(
+                        index=ctx.index_name or ctx.summary.indexName,
+                        query_text=case.query,
+                        profile=profile,
+                        size=5,
+                    )
+                except Exception as exc:
+                    logger.warning("Preview collection failed for '%s': %s", case.query, exc)
+                    previews[case.id] = []
+        finally:
+            if close_after:
+                await es_svc.close()
+
+        return previews
 
     async def _pick_next_experiment(
         self,
@@ -522,7 +667,8 @@ class RunManager:
                 logger.warning("LLM suggestion failed: %s", exc)
 
         # Fallback: systematic search space exploration
-        return _heuristic_next_experiment(ctx.current_profile, ctx.experiments)
+        combined_history = [*ctx.prior_experiments, *ctx.experiments]
+        return _heuristic_next_experiment(ctx.current_profile, combined_history)
 
     async def _persona_simulator_loop(self, run_id: str) -> None:
         """Simulate persona search activity for live mode."""
@@ -756,7 +902,12 @@ class RunManager:
         if ctx.llm_config and ctx.llm_config.provider != "disabled":
             llm_svc = LLMService(ctx.llm_config)
 
-        evaluator = CommitteeEvaluator(ctx.profile, llm_svc, warnings=ctx.warnings)
+        evaluator = CommitteeEvaluator(
+            ctx.profile,
+            llm_svc,
+            warnings=ctx.warnings,
+            thresholds=ctx.score_thresholds,
+        )
         rewrite_engine = CommitteeRewriteEngine(ctx.profile, llm_svc, warnings=ctx.warnings)
         now_ts = lambda: datetime.now(timezone.utc).isoformat()
 
@@ -810,8 +961,12 @@ class RunManager:
             {"type": "metrics.tick", "payload": ctx.metrics.model_dump()},
         )
 
-        plateau_count = 0
         parameter_state: Dict[int, Dict[str, str]] = {}
+        parameter_history: Dict[str, deque[float]] = {
+            name: deque(maxlen=6)
+            for name in {**BASE_PARAMETER_VALUES, **ctx.profile.parameter_values}
+        }
+        plateau_window: deque[tuple[float, str]] = deque(maxlen=12)
         rng = random.Random(42)
 
         for exp_num in range(ctx.max_rewrites):
@@ -822,13 +977,19 @@ class RunManager:
             if elapsed >= ctx.duration_minutes * 60:
                 break
 
-            if ctx.auto_stop_on_plateau and plateau_count >= 8:
+            if ctx.auto_stop_on_plateau and _committee_plateau_reached(plateau_window):
                 break
 
             try:
                 iteration_started = time.monotonic()
-                section = rng.choice(ctx.document.sections)
-                proposal = await rewrite_engine.propose(section, parameter_state, rng)
+                section = _select_committee_section(ctx, rng)
+                parameter_name = _select_committee_parameter(parameter_history, rng)
+                proposal = await rewrite_engine.propose(
+                    section,
+                    parameter_state,
+                    rng,
+                    parameter_name=parameter_name,
+                )
                 baseline_for_exp = ctx.metrics.currentScore
                 before_text = section.content
 
@@ -857,9 +1018,11 @@ class RunManager:
                 candidate_score = evaluator.consensus_score(candidate_personas, ctx.evaluation_mode)
                 duration_ms = int((time.monotonic() - eval_start) * 1000)
 
+                current_persona_map = {persona.id: persona for persona in ctx.personas}
                 persona_deltas = {
-                    candidate.id: round(candidate.currentScore - current.currentScore, 4)
-                    for candidate, current in zip(candidate_personas, ctx.personas)
+                    candidate.id: round(candidate.currentScore - current_persona_map[candidate.id].currentScore, 4)
+                    for candidate in candidate_personas
+                    if candidate.id in current_persona_map
                 }
                 worst_drop = min(persona_deltas.values()) if persona_deltas else 0.0
                 do_no_harm = worst_drop >= ctx.do_no_harm_floor
@@ -873,16 +1036,16 @@ class RunManager:
                         candidate_personas=candidate_personas,
                     )
                     parameter_state.setdefault(section.id, {})[proposal.parameter_name] = proposal.new_value
-                    plateau_count = 0
                     if candidate_score >= ctx._best_score:
                         ctx._best_score = candidate_score
                         ctx.best_document = ctx.document.model_copy(deep=True)
                 else:
                     decision = "reverted"
-                    plateau_count += 1
 
                 delta_abs = candidate_score - baseline_for_exp
                 delta_pct = (delta_abs / max(baseline_for_exp, 0.001)) * 100
+                parameter_history.setdefault(proposal.parameter_name, deque(maxlen=6)).append(delta_abs)
+                plateau_window.append((ctx._best_score, proposal.parameter_name))
                 record = RewriteAttempt(
                     experimentId=exp_num + 1,
                     timestamp=now_ts(),
@@ -1011,10 +1174,19 @@ class RunManager:
             return await self.persistence.load_report(run_id)
         return None
 
-    async def list_search_runs(self, limit: int = 50) -> List[Dict[str, Any]]:
+    async def list_search_runs(
+        self,
+        limit: int = 50,
+        index_name: Optional[str] = None,
+        completed_only: bool = False,
+    ) -> List[Dict[str, Any]]:
         if not self.persistence:
             return []
-        return await self.persistence.list_runs(limit=limit)
+        return await self.persistence.list_runs(
+            limit=limit,
+            index_name=index_name,
+            completed_only=completed_only,
+        )
 
     async def _persist_search_run(self, run_id: str) -> None:
         if not self.persistence:
@@ -1091,22 +1263,100 @@ def _commit_committee_candidate(
     ctx.section_evaluations = candidate_evaluations
     ctx.personas = candidate_personas
 
+
+def _select_committee_section(ctx: CommitteeRunContext, rng: random.Random) -> Any:
+    section_scores: Dict[int, float] = {}
+    if ctx.personas:
+        for persona in ctx.personas:
+            for rollup in persona.perSection:
+                section_scores.setdefault(rollup.sectionId, 0.0)
+                section_scores[rollup.sectionId] += rollup.compositeScore
+        persona_count = max(len(ctx.personas), 1)
+        section_scores = {
+            section_id: total / persona_count
+            for section_id, total in section_scores.items()
+        }
+
+    weighted_sections = []
+    for section in ctx.document.sections:
+        avg_score = section_scores.get(section.id, 0.5)
+        content_weight = min(max(len(section.content), 120), 900) / 900
+        score_room = max(0.08, 1.08 - avg_score)
+        weight = score_room * (1.0 + content_weight * 0.45)
+        weighted_sections.append((section, weight))
+
+    total_weight = sum(weight for _, weight in weighted_sections) or 1.0
+    pick = rng.random() * total_weight
+    running = 0.0
+    for section, weight in weighted_sections:
+        running += weight
+        if pick <= running:
+            return section
+    return ctx.document.sections[-1]
+
+
+def _select_committee_parameter(parameter_history: Dict[str, deque[float]], rng: random.Random) -> str:
+    weighted_parameters = []
+    for name, history in parameter_history.items():
+        if not history:
+            weight = 1.2
+        else:
+            average_delta = sum(history) / len(history)
+            positive_hits = sum(1 for delta in history if delta > 0)
+            recent_negative_streak = len(history) >= 3 and all(delta <= 0 for delta in list(history)[-3:])
+            weight = 1.0 + max(average_delta, 0.0) * 24 + positive_hits * 0.45
+            if recent_negative_streak:
+                weight *= 0.55
+        weighted_parameters.append((name, max(weight, 0.2)))
+
+    total_weight = sum(weight for _, weight in weighted_parameters) or 1.0
+    pick = rng.random() * total_weight
+    running = 0.0
+    for name, weight in weighted_parameters:
+        running += weight
+        if pick <= running:
+            return name
+    return weighted_parameters[-1][0]
+
+
+def _committee_plateau_reached(window: deque[tuple[float, str]]) -> bool:
+    if len(window) < window.maxlen:
+        return False
+    scores = [item[0] for item in window]
+    parameters = {item[1] for item in window}
+    return (max(scores) - min(scores)) < 0.003 and len(parameters) >= 3
+
 def _apply_profile_change(profile: SearchProfile, change: SearchProfileChange) -> None:
     """Apply a SearchProfileChange to a SearchProfile in-place."""
+    import re as _re
     try:
+        # Handle field boost paths like "lexicalFields[0].boost"
+        m = _re.match(r"lexicalFields\[(\d+)\]\.boost", change.path)
+        if m:
+            idx = int(m.group(1))
+            if idx < len(profile.lexicalFields):
+                profile.lexicalFields[idx] = dict(profile.lexicalFields[idx])
+                profile.lexicalFields[idx]["boost"] = change.after
+            return
         if hasattr(profile, change.path):
             setattr(profile, change.path, change.after)
     except Exception as exc:
         logger.warning("Failed to apply change %s=%r: %s", change.path, change.after, exc)
 
 
-# Search space for heuristic experiments
-_SEARCH_SPACE: List[Dict[str, Any]] = [
-    {"path": "minimumShouldMatch", "values": ["50%", "60%", "70%", "75%", "80%", "85%", "90%"]},
+# ---------------------------------------------------------------------------
+# Search space definitions
+# ---------------------------------------------------------------------------
+
+_GRID_LEXICAL: List[Dict[str, Any]] = [
+    {"path": "multiMatchType", "values": ["best_fields", "most_fields", "cross_fields", "phrase"]},
+    {"path": "minimumShouldMatch", "values": ["50%", "60%", "70%", "75%", "80%", "85%", "90%", "100%"]},
     {"path": "tieBreaker", "values": [0.0, 0.1, 0.2, 0.3, 0.4, 0.5]},
     {"path": "phraseBoost", "values": [0.0, 0.5, 1.0, 1.5, 2.0, 3.0]},
-    {"path": "multiMatchType", "values": ["best_fields", "most_fields", "cross_fields", "phrase"]},
     {"path": "fuzziness", "values": ["0", "AUTO"]},
+]
+
+_GRID_VECTOR: List[Dict[str, Any]] = [
     {"path": "vectorWeight", "values": [0.2, 0.3, 0.35, 0.4, 0.5, 0.6]},
     {"path": "fusionMethod", "values": ["weighted_sum", "rrf"]},
     {"path": "rrfRankConstant", "values": [20, 40, 60, 80, 100]},
@@ -1125,11 +1375,42 @@ _FIELD_LABELS: Dict[str, str] = {
     "knnK": "KNN k",
 }
 
+_BOOST_VALUES = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0]
+
+# Continuous ranges for random perturbation (phase 2+)
+_CONTINUOUS_PARAMS: List[Dict[str, Any]] = [
+    {"path": "tieBreaker", "min": 0.0, "max": 0.7, "round": 2, "label": "Tie breaker"},
+    {"path": "phraseBoost", "min": 0.0, "max": 5.0, "round": 1, "label": "Phrase boost"},
+]
+
+_DISCRETE_PARAMS: List[Dict[str, Any]] = [
+    {"path": "multiMatchType", "values": ["best_fields", "most_fields", "cross_fields", "phrase"], "label": "Multi-match type"},
+    {"path": "minimumShouldMatch", "values": ["50%", "55%", "60%", "65%", "70%", "75%", "80%", "85%", "90%", "95%", "100%"], "label": "Minimum should match"},
+    {"path": "fuzziness", "values": ["0", "AUTO"], "label": "Fuzziness"},
+]
+
+_VECTOR_CONTINUOUS: List[Dict[str, Any]] = [
+    {"path": "vectorWeight", "min": 0.1, "max": 0.8, "round": 2, "label": "Vector weight"},
+]
+
+_VECTOR_DISCRETE: List[Dict[str, Any]] = [
+    {"path": "fusionMethod", "values": ["weighted_sum", "rrf"], "label": "Fusion method"},
+    {"path": "rrfRankConstant", "min": 10, "max": 120, "step": 10, "label": "RRF rank constant"},
+    {"path": "knnK", "min": 5, "max": 80, "step": 5, "label": "KNN k"},
+]
+
 
 def _heuristic_next_experiment(
     profile: SearchProfile, history: List[ExperimentRecord]
 ) -> Optional[SearchProfileChange]:
-    """Pick the next experiment from a systematic search space grid."""
+    """
+    Multi-phase experiment generator — never runs out of ideas.
+
+    Phase 1 (grid sweep):  Systematic grid search of all single-param values.
+    Phase 2 (random perturbation):  Random single-param jitter around current best.
+    Phase 3 (multi-param combos):  Simultaneous 2-param random mutations.
+    Phases 2 & 3 alternate forever — the optimizer can think for as long as you let it.
+    """
     tried: Dict[str, set] = {}
     for exp in history:
         path = exp.change.path
@@ -1137,24 +1418,329 @@ def _heuristic_next_experiment(
             tried[path] = set()
         tried[path].add(str(exp.change.after))
 
-    rng = random.Random(len(history))
-    # Shuffle to avoid always trying the same field
-    space = list(_SEARCH_SPACE)
+    n = len(history)
+    rng = random.Random(n)
+
+    # ------------------------------------------------------------------
+    # Phase 1: grid sweep (first pass over all discrete values)
+    # ------------------------------------------------------------------
+    grid_result = _grid_sweep(profile, tried, rng)
+    if grid_result is not None:
+        return grid_result
+
+    # ------------------------------------------------------------------
+    # Phase 2+: random perturbation — never exhausts
+    # ------------------------------------------------------------------
+    return _random_perturbation(profile, history, rng)
+
+
+def _grid_sweep(
+    profile: SearchProfile,
+    tried: Dict[str, set],
+    rng: random.Random,
+) -> Optional[SearchProfileChange]:
+    """Phase 1: systematic grid search of all values."""
+    security_candidates = generate_security_field_mutations(profile)
+    rng.shuffle(security_candidates)
+    for candidate in security_candidates:
+        if str(candidate.after) not in tried.get(candidate.path, set()):
+            return candidate
+
+    space = list(_GRID_LEXICAL)
+    if profile.useVector:
+        space.extend(_GRID_VECTOR)
+
+    for i, field_entry in enumerate(profile.lexicalFields):
+        boost_path = f"lexicalFields[{i}].boost"
+        space.append({
+            "path": boost_path,
+            "values": _BOOST_VALUES,
+            "_field_index": i,
+            "_field_name": field_entry.get("field", f"field_{i}"),
+        })
+
     rng.shuffle(space)
 
     for item in space:
         path = item["path"]
-        current_val = getattr(profile, path, None)
         tried_vals = tried.get(path, set())
 
-        for val in item["values"]:
-            if str(val) not in tried_vals and val != current_val:
-                label = f"{_FIELD_LABELS.get(path, path)} {current_val!r} → {val!r}"
-                return SearchProfileChange(
-                    path=path,
-                    before=current_val,
-                    after=val,
-                    label=label,
-                )
-
+        if path.startswith("lexicalFields["):
+            field_idx = item["_field_index"]
+            current_val = profile.lexicalFields[field_idx]["boost"]
+            field_name = item["_field_name"]
+            for val in item["values"]:
+                if str(val) not in tried_vals and val != current_val:
+                    return SearchProfileChange(
+                        path=path, before=current_val, after=val,
+                        label=f"{field_name} boost {current_val} → {val}",
+                    )
+        else:
+            current_val = getattr(profile, path, None)
+            for val in item["values"]:
+                if str(val) not in tried_vals and val != current_val:
+                    return SearchProfileChange(
+                        path=path, before=current_val, after=val,
+                        label=f"{_FIELD_LABELS.get(path, path)} {current_val!r} → {val!r}",
+                    )
     return None
+
+
+def _random_perturbation(
+    profile: SearchProfile,
+    history: List[ExperimentRecord],
+    rng: random.Random,
+) -> SearchProfileChange:
+    """
+    Phase 2+: random perturbation around the current profile.
+    Never returns None — can always generate a new experiment.
+    """
+    n = len(history)
+
+    # Alternate between single-param and multi-param mutations
+    reverted_signatures = {
+        (exp.change.path, str(exp.change.after))
+        for exp in history
+        if exp.decision == "reverted"
+    }
+
+    if n % 5 < 3:
+        # Single-param random jitter
+        return _single_random_mutation(profile, reverted_signatures, rng)
+    else:
+        # Multi-param combo: apply 2 random changes at once (reported as one)
+        return _combo_mutation(profile, reverted_signatures, rng)
+
+
+def _single_random_mutation(
+    profile: SearchProfile,
+    reverted_signatures: set[tuple[str, str]],
+    rng: random.Random,
+) -> SearchProfileChange:
+    """Randomly perturb one parameter."""
+    # Collect all possible mutation targets
+    candidates: List[SearchProfileChange] = []
+
+    # Field boosts: jitter current value by ±0.25 to ±2.0
+    for i, field_entry in enumerate(profile.lexicalFields):
+        current = field_entry["boost"]
+        delta = rng.choice([-2.0, -1.0, -0.5, -0.25, 0.25, 0.5, 1.0, 2.0])
+        new_val = round(max(0.1, min(10.0, current + delta)), 2)
+        if new_val != current:
+            candidates.append(SearchProfileChange(
+                path=f"lexicalFields[{i}].boost",
+                before=current,
+                after=new_val,
+                label=f"{field_entry.get('field', f'field_{i}')} boost {current} → {new_val}",
+            ))
+
+    # Continuous params
+    for param in _CONTINUOUS_PARAMS:
+        current = getattr(profile, param["path"], 0.0)
+        new_val = round(rng.uniform(param["min"], param["max"]), param["round"])
+        if new_val != current:
+            candidates.append(SearchProfileChange(
+                path=param["path"],
+                before=current,
+                after=new_val,
+                label=f"{param['label']} {current} → {new_val}",
+            ))
+
+    # Discrete params
+    for param in _DISCRETE_PARAMS:
+        current = getattr(profile, param["path"], None)
+        other_vals = [v for v in param["values"] if v != current]
+        if other_vals:
+            new_val = rng.choice(other_vals)
+            candidates.append(SearchProfileChange(
+                path=param["path"],
+                before=current,
+                after=new_val,
+                label=f"{param['label']} {current!r} → {new_val!r}",
+            ))
+
+    # Vector params (if enabled)
+    if profile.useVector:
+        for param in _VECTOR_CONTINUOUS:
+            current = getattr(profile, param["path"], 0.35)
+            new_val = round(rng.uniform(param["min"], param["max"]), param["round"])
+            if new_val != current:
+                candidates.append(SearchProfileChange(
+                    path=param["path"],
+                    before=current,
+                    after=new_val,
+                    label=f"{param['label']} {current} → {new_val}",
+                ))
+        for param in _VECTOR_DISCRETE:
+            if "values" in param:
+                current = getattr(profile, param["path"], None)
+                other_vals = [v for v in param["values"] if v != current]
+                if other_vals:
+                    new_val = rng.choice(other_vals)
+                    candidates.append(SearchProfileChange(
+                        path=param["path"],
+                        before=current,
+                        after=new_val,
+                        label=f"{param['label']} {current!r} → {new_val!r}",
+                    ))
+            elif "min" in param:
+                current = getattr(profile, param["path"], param["min"])
+                step = param.get("step", 1)
+                possible = list(range(param["min"], param["max"] + 1, step))
+                other_vals = [v for v in possible if v != current]
+                if other_vals:
+                    new_val = rng.choice(other_vals)
+                    candidates.append(SearchProfileChange(
+                        path=param["path"],
+                        before=current,
+                        after=new_val,
+                        label=f"{param['label']} {current} → {new_val}",
+                    ))
+
+    filtered_candidates = [
+        candidate
+        for candidate in candidates
+        if (candidate.path, str(candidate.after)) not in reverted_signatures
+    ]
+    if filtered_candidates:
+        return rng.choice(filtered_candidates)
+    if candidates:
+        return rng.choice(candidates)
+
+    # Absolute fallback: flip fuzziness
+    current_fuzz = profile.fuzziness
+    new_fuzz = "AUTO" if current_fuzz == "0" else "0"
+    return SearchProfileChange(
+        path="fuzziness", before=current_fuzz, after=new_fuzz,
+        label=f"Fuzziness {current_fuzz!r} → {new_fuzz!r}",
+    )
+
+
+def _combo_mutation(
+    profile: SearchProfile,
+    reverted_signatures: set[tuple[str, str]],
+    rng: random.Random,
+) -> SearchProfileChange:
+    """
+    Aggressive random mutation — bigger swings to explore distant regions
+    of the search space. Uses wider ranges than the gentle single-param jitter.
+    """
+    candidates: List[SearchProfileChange] = []
+
+    # Big field boost swings
+    for i, field_entry in enumerate(profile.lexicalFields):
+        current = field_entry["boost"]
+        # Try values far from current
+        new_val = round(rng.uniform(0.1, 8.0), 1)
+        if abs(new_val - current) > 0.5:
+            candidates.append(SearchProfileChange(
+                path=f"lexicalFields[{i}].boost",
+                before=current,
+                after=new_val,
+                label=f"{field_entry.get('field', f'field_{i}')} boost {current} → {new_val} (explore)",
+            ))
+
+    # Wide tie_breaker sweep
+    current_tb = profile.tieBreaker
+    new_tb = round(rng.uniform(0.0, 0.8), 2)
+    if new_tb != current_tb:
+        candidates.append(SearchProfileChange(
+            path="tieBreaker", before=current_tb, after=new_tb,
+            label=f"Tie breaker {current_tb} → {new_tb} (explore)",
+        ))
+
+    # Wide phrase boost sweep
+    current_pb = profile.phraseBoost
+    new_pb = round(rng.uniform(0.0, 6.0), 1)
+    if new_pb != current_pb:
+        candidates.append(SearchProfileChange(
+            path="phraseBoost", before=current_pb, after=new_pb,
+            label=f"Phrase boost {current_pb} → {new_pb} (explore)",
+        ))
+
+    # Random minimumShouldMatch
+    all_msm = ["50%", "55%", "60%", "65%", "70%", "75%", "80%", "85%", "90%", "95%", "100%"]
+    current_msm = profile.minimumShouldMatch
+    other_msm = [v for v in all_msm if v != current_msm]
+    if other_msm:
+        new_msm = rng.choice(other_msm)
+        candidates.append(SearchProfileChange(
+            path="minimumShouldMatch", before=current_msm, after=new_msm,
+            label=f"Minimum should match {current_msm!r} → {new_msm!r} (explore)",
+        ))
+
+    filtered_candidates = [
+        candidate
+        for candidate in candidates
+        if (candidate.path, str(candidate.after)) not in reverted_signatures
+    ]
+    if filtered_candidates:
+        return rng.choice(filtered_candidates)
+    if candidates:
+        return rng.choice(candidates)
+
+    return _single_random_mutation(profile, reverted_signatures, rng)
+
+
+def _hypothesis_text(change: SearchProfileChange) -> str:
+    path = change.path
+    before = change.before
+    after = change.after
+
+    if path.startswith("lexicalFields[") and "boost" in path:
+        field_name = change.label.split(" boost", 1)[0]
+        if isinstance(before, (int, float)) and isinstance(after, (int, float)):
+            if after > before:
+                return f"Increase {field_name} influence so stronger {field_name} matches rise earlier in the ranking."
+            return f"Reduce {field_name} influence to let other fields carry more of the ranking signal."
+
+    if path == "multiMatchType":
+        descriptions = {
+            "cross_fields": "Treat terms as shared across fields so fragmented matches can still rank well.",
+            "most_fields": "Reward documents that match across many fields rather than one dominant field.",
+            "phrase": "Favor ordered phrase matches when exact wording should matter most.",
+            "best_fields": "Bias toward the single strongest field match to sharpen precision.",
+        }
+        return descriptions.get(str(after), f"Change the multi-match strategy to {after} and measure the ranking tradeoff.")
+
+    if path == "minimumShouldMatch":
+        try:
+            before_pct = int(str(before).replace("%", ""))
+            after_pct = int(str(after).replace("%", ""))
+            if after_pct > before_pct:
+                return "Tighten term matching so weaker partial matches fall away and exact intent carries more weight."
+            return "Relax term matching so the engine can recover relevant documents that only match part of the query."
+        except Exception:
+            return "Adjust term-matching strictness to rebalance recall versus precision."
+
+    if path == "phraseBoost":
+        if isinstance(before, (int, float)) and isinstance(after, (int, float)):
+            if after > before:
+                return "Reward exact phrase matches more strongly when users search with high-intent wording."
+            return "Reduce phrase strictness so near-matches are less likely to be over-penalized."
+
+    if path == "fuzziness":
+        if str(after) == "AUTO":
+            return "Allow tolerant matching so typos, variants, and inflections still surface relevant results."
+        return "Turn off fuzzy matching to sharpen exact lexical precision and reduce noisy recall."
+
+    if path == "tieBreaker":
+        return "Rebalance how much supporting field matches contribute once one field already matches strongly."
+
+    if path == "vectorWeight":
+        if isinstance(before, (int, float)) and isinstance(after, (int, float)) and after > before:
+            return "Lean harder on semantic similarity to catch concept matches beyond exact wording."
+        return "Pull ranking back toward lexical evidence so exact field matches dominate over semantic recall."
+
+    if path == "fusionMethod":
+        if str(after) == "rrf":
+            return "Switch to reciprocal-rank fusion to blend lexical and vector rankings more conservatively."
+        return "Use weighted-score fusion to let relative relevance scores drive the blend directly."
+
+    if path == "rrfRankConstant":
+        return "Adjust how aggressively reciprocal-rank fusion rewards higher-ranked documents from each retriever."
+
+    if path == "knnK":
+        return "Widen the semantic candidate set to see whether more vector neighbors improve final recall."
+
+    return f"Test whether changing {path} from {before} to {after} improves ranked relevance without hurting the broader query set."

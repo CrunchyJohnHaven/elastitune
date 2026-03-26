@@ -172,10 +172,21 @@ class CommitteeConnectionResponse(BaseModel):
     warnings: List[str] = []
 
 
+class CommitteeScoreThresholds(BaseModel):
+    supportive: float = 0.72
+    cautiouslyInterested: float = 0.58
+    neutral: float = 0.45
+    skeptical: float = 0.32
+    positiveEmotion: float = 0.65
+    enthusiasticQuote: float = 0.72
+    cautiousQuote: float = 0.55
+
+
 class CommitteeConnectPayload(BaseModel):
     evaluationMode: CommitteeEvaluationMode = "full_committee"
     useSeedPersonas: bool = True
     committeeDescription: Optional[str] = None
+    industryProfileId: Optional[str] = None
     llm: Optional[LlmConfig] = None
     personas: Optional[List[CommitteePersona]] = None
 
@@ -186,6 +197,7 @@ class StartCommitteeRunRequest(BaseModel):
     maxRewrites: int = 36
     autoStopOnPlateau: bool = True
     doNoHarmFloor: float = -0.05
+    scoreThresholds: Optional[CommitteeScoreThresholds] = None
 
 
 class StartCommitteeRunResponse(BaseModel):

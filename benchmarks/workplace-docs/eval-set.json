@@ -1,0 +1,86 @@
+[
+  {
+    "id": "wp_eval_001",
+    "query": "vacation time off policy",
+    "relevantDocIds": ["5"],
+    "difficulty": "easy",
+    "personaHint": "HR employee"
+  },
+  {
+    "id": "wp_eval_002",
+    "query": "health insurance benefits",
+    "relevantDocIds": ["15"],
+    "difficulty": "hard",
+    "personaHint": "new hire"
+  },
+  {
+    "id": "wp_eval_003",
+    "query": "work from home remote policy",
+    "relevantDocIds": ["1", "3", "2"],
+    "difficulty": "easy",
+    "personaHint": "remote employee"
+  },
+  {
+    "id": "wp_eval_004",
+    "query": "salary compensation framework",
+    "relevantDocIds": ["13", "11"],
+    "difficulty": "medium",
+    "personaHint": "engineering manager"
+  },
+  {
+    "id": "wp_eval_005",
+    "query": "new employee onboarding guide",
+    "relevantDocIds": ["15"],
+    "difficulty": "easy",
+    "personaHint": "new hire"
+  },
+  {
+    "id": "wp_eval_006",
+    "query": "intellectual property agreement",
+    "relevantDocIds": ["8"],
+    "difficulty": "easy",
+    "personaHint": "legal"
+  },
+  {
+    "id": "wp_eval_007",
+    "query": "sales strategy goals targets",
+    "relevantDocIds": ["4", "7", "12"],
+    "difficulty": "medium",
+    "personaHint": "sales manager"
+  },
+  {
+    "id": "wp_eval_008",
+    "query": "performance review evaluation",
+    "relevantDocIds": ["11"],
+    "difficulty": "medium",
+    "personaHint": "team lead"
+  },
+  {
+    "id": "wp_eval_009",
+    "query": "engineering career growth levels",
+    "relevantDocIds": ["6"],
+    "difficulty": "medium",
+    "personaHint": "software engineer"
+  },
+  {
+    "id": "wp_eval_010",
+    "query": "office pet rules bring dog",
+    "relevantDocIds": ["10"],
+    "difficulty": "easy",
+    "personaHint": "office worker"
+  },
+  {
+    "id": "wp_eval_011",
+    "query": "code of conduct ethics",
+    "relevantDocIds": ["9"],
+    "difficulty": "easy",
+    "personaHint": "compliance officer"
+  },
+  {
+    "id": "wp_eval_012",
+    "query": "tax election W4 forms",
+    "relevantDocIds": ["14"],
+    "difficulty": "hard",
+    "personaHint": "HR assistant"
+  }
+]

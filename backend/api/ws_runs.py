@@ -29,28 +29,41 @@ async def ws_run_events(websocket: WebSocket, run_id: str) -> None:
     """
     run_manager: RunManager = websocket.app.state.run_manager
 
-    # Verify the run exists before accepting
+    # Accept both active runs and persisted completed runs.
+    snapshot = await run_manager.get_any_snapshot(run_id)
     ctx = await run_manager.get_any_run(run_id)
-    if ctx is None:
+    if snapshot is None and ctx is None:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
 
     await websocket.accept()
     logger.info("WebSocket client connected to run %s", run_id)
 
-    # Subscribe to the run's event queue
-    queue = await run_manager.subscribe(run_id)
-
     try:
         # Send the current snapshot immediately so the client has a consistent
         # starting state before streaming delta events.
-        snapshot = await run_manager.get_any_snapshot(run_id)
         if snapshot:
             initial_event = {
                 "type": "snapshot",
                 "payload": snapshot.model_dump(),
             }
             await websocket.send_text(orjson.dumps(initial_event).decode())
+
+        initial_stage = getattr(snapshot, "stage", None)
+        if initial_stage in ("completed", "error"):
+            await websocket.send_text(
+                orjson.dumps(
+                    {
+                        "type": "run.complete",
+                        "payload": {"runId": run_id, "stage": initial_stage},
+                    }
+                ).decode()
+            )
+            await websocket.close(code=status.WS_1000_NORMAL_CLOSURE)
+            return
+
+        # Subscribe to the run's event queue only for active runs.
+        queue = await run_manager.subscribe(run_id)
 
         # Stream events from the queue
         while True:
@@ -69,6 +82,17 @@ async def ws_run_events(websocket: WebSocket, run_id: str) -> None:
                     while not queue.empty():
                         remaining = queue.get_nowait()
                         await websocket.send_text(orjson.dumps(remaining).decode())
+                    await websocket.send_text(
+                        orjson.dumps(
+                            {
+                                "type": "run.complete",
+                                "payload": {
+                                    "runId": run_id,
+                                    "stage": event.get("payload", {}).get("stage", "completed"),
+                                },
+                            }
+                        ).decode()
+                    )
                     break
 
             except asyncio.TimeoutError:
@@ -80,9 +104,18 @@ async def ws_run_events(websocket: WebSocket, run_id: str) -> None:
                     break
 
                 # Check if run is done and queue is empty — close gracefully
-                updated_ctx = await run_manager.get_run(run_id)
-                if updated_ctx and updated_ctx.stage in ("completed", "error"):
+                updated_snapshot = await run_manager.get_any_snapshot(run_id)
+                updated_stage: Optional[str] = getattr(updated_snapshot, "stage", None)
+                if updated_stage in ("completed", "error"):
                     if queue.empty():
+                        await websocket.send_text(
+                            orjson.dumps(
+                                {
+                                    "type": "run.complete",
+                                    "payload": {"runId": run_id, "stage": updated_stage},
+                                }
+                            ).decode()
+                        )
                         break
 
     except WebSocketDisconnect:
@@ -94,5 +127,6 @@ async def ws_run_events(websocket: WebSocket, run_id: str) -> None:
         except Exception:
             pass
     finally:
-        await run_manager.unsubscribe(run_id, queue)
+        if "queue" in locals():
+            await run_manager.unsubscribe(run_id, queue)
         logger.debug("WebSocket unsubscribed from run %s", run_id)

@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 from typing import Iterable
+from urllib.request import urlopen
 
 from elasticsearch import Elasticsearch, helpers
 
@@ -22,6 +23,20 @@ DEFAULT_DATASET = (
     / "dataset"
     / "products.json"
 )
+REMOTE_DATASET = (
+    "https://raw.githubusercontent.com/elastic/elasticsearch-labs/main/"
+    "supporting-blog-content/hybrid-search-for-an-e-commerce-product-catalogue/"
+    "product-store-search/files/dataset/products.json"
+)
+
+
+def ensure_dataset(path: Path) -> Path:
+    if path.exists():
+        return path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with urlopen(REMOTE_DATASET) as response:
+        path.write_bytes(response.read())
+    return path
 
 
 def load_products(path: Path, limit: int | None) -> list[dict]:
@@ -74,11 +89,7 @@ def main() -> None:
     parser.add_argument("--hybrid", action="store_true")
     args = parser.parse_args()
 
-    dataset_path = Path(args.dataset)
-    if not dataset_path.exists():
-        raise SystemExit(
-            f"Dataset not found at {dataset_path}. Run setup_target.py first or pass --dataset explicitly."
-        )
+    dataset_path = ensure_dataset(Path(args.dataset))
 
     products = load_products(dataset_path, args.limit)
     client = Elasticsearch(args.es_url, api_key=args.api_key or None, verify_certs=False, ssl_show_warn=False)

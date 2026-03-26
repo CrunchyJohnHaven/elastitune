@@ -1,0 +1,48 @@
+version: "3.9"
+
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+    ports:
+      - "9200:9200"
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    environment:
+      - ELASTITUNE_ES_URL=http://elasticsearch:9200
+      - HOST=0.0.0.0
+      - PORT=8000
+    depends_on:
+      - elasticsearch
+    ports:
+      - "8000:8000"
+
+  init:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    depends_on:
+      - elasticsearch
+    environment:
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+    command: ["bash", "/app/docker/init/setup.sh"]
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+
+volumes:
+  esdata:

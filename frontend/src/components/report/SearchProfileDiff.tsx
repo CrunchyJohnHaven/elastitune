@@ -8,6 +8,12 @@ interface SearchProfileDiffProps {
   diff: SearchProfileChange[];
 }
 
+function formatValue(val: unknown): string {
+  if (val === null || val === undefined) return '—';
+  if (typeof val === 'object') return JSON.stringify(val);
+  return String(val);
+}
+
 function DiffRow({ change }: { change: SearchProfileChange }) {
   const improved =
     typeof change.after === 'number' &&
@@ -49,7 +55,7 @@ function DiffRow({ change }: { change: SearchProfileChange }) {
           textAlign: 'right',
         }}
       >
-        {String(change.before)}
+        {formatValue(change.before)}
       </span>
       <span
         style={{
@@ -71,7 +77,7 @@ function DiffRow({ change }: { change: SearchProfileChange }) {
           borderRadius: 4,
         }}
       >
-        {String(change.after)}
+        {formatValue(change.after)}
       </span>
     </div>
   );

@@ -49,47 +49,49 @@ class CommitteeRewriteEngine:
         section: DocumentSection,
         state: Dict[int, Dict[str, str]],
         rng: random.Random,
+        parameter_name: Optional[str] = None,
     ) -> RewriteProposal:
         parameter_space = {**BASE_PARAMETER_VALUES, **self.profile.parameter_values}
-        parameter_name = rng.choice(list(parameter_space.keys()))
-        current_value = state.get(section.id, {}).get(parameter_name, parameter_space[parameter_name][0])
-        candidates = [value for value in parameter_space[parameter_name] if value != current_value]
+        chosen_parameter = parameter_name or rng.choice(list(parameter_space.keys()))
+        current_value = state.get(section.id, {}).get(chosen_parameter, parameter_space[chosen_parameter][0])
+        candidates = [value for value in parameter_space[chosen_parameter] if value != current_value]
         new_value = rng.choice(candidates)
 
         if self.llm and self.llm.available:
             try:
                 rewritten = await self.llm.rewrite_committee_section(
                     section=section,
-                    parameter_name=parameter_name,
+                    parameter_name=chosen_parameter,
                     old_value=current_value,
                     new_value=new_value,
                     industry_label=self.profile.label,
+                    parameter_options=parameter_space,
                 )
                 if rewritten:
                     return RewriteProposal(
                         section_id=section.id,
-                        parameter_name=parameter_name,
+                        parameter_name=chosen_parameter,
                         old_value=current_value,
                         new_value=new_value,
-                        description=_description(parameter_name, current_value, new_value, section.title),
+                        description=_description(chosen_parameter, new_value),
                         rewritten_text=rewritten.strip(),
                     )
             except Exception as exc:
                 logger.warning(
                     "LLM rewrite failed for section=%s parameter=%s: %s",
                     section.id,
-                    parameter_name,
+                    chosen_parameter,
                     exc,
                 )
                 self._warn_once("AI rewrite generation failed for one or more sections; rule-based rewriting was used instead.")
 
         return RewriteProposal(
             section_id=section.id,
-            parameter_name=parameter_name,
+            parameter_name=chosen_parameter,
             old_value=current_value,
             new_value=new_value,
-            description=_description(parameter_name, current_value, new_value, section.title),
-            rewritten_text=_heuristic_rewrite(self.profile, section, parameter_name, new_value),
+            description=_description(chosen_parameter, new_value),
+            rewritten_text=_heuristic_rewrite(self.profile, section, chosen_parameter, new_value),
         )
 
     def _warn_once(self, message: str) -> None:
@@ -97,9 +99,57 @@ class CommitteeRewriteEngine:
             self.warnings.append(message)
 
 
-def _description(parameter_name: str, old_value: str, new_value: str, title: str) -> str:
-    label = parameter_name.replace("_", " ")
-    return f"{title}: {label} {old_value} -> {new_value}"
+def _description(parameter_name: str, new_value: str) -> str:
+    descriptions = {
+        "stat_framing": {
+            "conservative": "Softened the statistical framing and added caveat language.",
+            "moderate": "Balanced the headline numbers with steadier proof language.",
+            "aggressive": "Led with the strongest measurable outcome to sharpen urgency.",
+        },
+        "proof_point_density": {
+            "low": "Reduced supporting proof to keep the story tighter and faster.",
+            "medium": "Added a second proof anchor so the claim feels better supported.",
+            "high": "Layered in multiple proof anchors to make the case feel more defensible.",
+        },
+        "cta_urgency": {
+            "soft": "Softened the next step so the ask feels easier to accept.",
+            "firm": "Made the next step more concrete with a specific working session ask.",
+            "direct": "Turned the close into a direct scheduling ask with near-term urgency.",
+        },
+        "objection_preemption": {
+            "none": "Removed up-front objection handling to keep the section leaner.",
+            "light": "Added one objection-preemption line to reduce likely pushback.",
+            "heavy": "Front-loaded multiple objection-handling cues before the room can raise them.",
+        },
+        "technical_depth": {
+            "executive": "Shifted the section toward business outcomes and governance language.",
+            "practitioner": "Added implementation detail around architecture, rollout, and ownership.",
+            "mixed": "Balanced executive framing with a short technical proof layer.",
+        },
+        "risk_narrative": {
+            "opportunity": "Reframed the section around upside and forward momentum.",
+            "threat": "Led with downside risk to make inaction feel more costly.",
+            "balanced": "Balanced the downside of waiting with the upside of moving now.",
+        },
+        "social_proof_type": {
+            "internal": "Anchored the proof around Elastic's own operating outcomes.",
+            "external": "Swapped in customer-facing proof to increase credibility.",
+            "peer_company": "Shifted proof toward a peer-company example closer to this buyer.",
+            "analyst_report": "Added third-party market validation to reduce vendor-only bias.",
+            "federal": "Shifted proof toward federal deployment familiarity and procurement comfort.",
+        },
+        "specificity": {
+            "general": "Pulled the language back toward a broader buyer-ready narrative.",
+            "role_tailored": "Tailored the language to the specific stakeholder role.",
+            "vertical_tailored": "Tailored the section to this industry's buying dynamics.",
+            "agency_tailored": "Tailored the section more directly to the target agency context.",
+            "hyper_specific": "Made the language feel prepared for this exact room and workflow.",
+        },
+    }
+    return descriptions.get(parameter_name, {}).get(
+        new_value,
+        f"Adjusted {parameter_name.replace('_', ' ')} to {new_value}.",
+    )
 
 
 def _heuristic_rewrite(

@@ -95,7 +95,48 @@ export default function RightRail() {
   const personaActivityById = useAppStore(state => state.personaActivityById);
   const setSelectedPersona = useAppStore(state => state.setSelectedPersona);
 
-  if (!summary || !metrics || !searchProfile || !recommendedProfile || !compression) return null;
+  if (!summary || !metrics || !searchProfile || !recommendedProfile || !compression) {
+    return (
+      <div
+        style={{
+          width: 360,
+          flexShrink: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100%',
+          background: PANEL_BG,
+          borderLeft: `1px solid ${PANEL_BORDER}`,
+          backdropFilter: 'blur(12px)',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 12,
+        }}
+      >
+        <div
+          style={{
+            width: 28,
+            height: 28,
+            border: '2px solid rgba(255,255,255,0.08)',
+            borderTopColor: '#4DA3FF',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+          }}
+        />
+        <span
+          style={{
+            fontFamily: 'JetBrains Mono, monospace',
+            fontSize: 10,
+            color: '#6B7480',
+            textTransform: 'uppercase',
+            letterSpacing: '0.1em',
+          }}
+        >
+          Loading telemetry…
+        </span>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
 
   const selectedPersona =
     personas.find(persona => persona.id === selectedPersonaId)
@@ -105,7 +146,9 @@ export default function RightRail() {
   const selectedPersonaActivity = selectedPersona
     ? (personaActivityById[selectedPersona.id] ?? EMPTY_ACTIVITY)
     : EMPTY_ACTIVITY;
-  const activeCount = personas.filter(persona => persona.state === 'searching' || persona.state === 'reacting').length;
+  // Persona state transitions happen instantly in backend batch, so 'searching' is never seen.
+  // Count personas as "active" if they have non-idle state (recently searched).
+  const activeCount = personas.filter(persona => persona.state !== 'idle' && persona.totalSearches > 0).length;
   const resolvedCount = personas.reduce(
     (sum, persona) => sum + persona.successes + persona.partials,
     0
