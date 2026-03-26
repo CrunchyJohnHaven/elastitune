@@ -65,7 +65,7 @@ Five benchmark datasets are bundled. Use `python3 benchmarks/setup.py` to load t
 | Benchmark | Index | Docs | Eval queries |
 |---|---|---:|---:|
 | Product Store | `products-catalog` | 931 | 8 |
-| Books Catalog | `books-catalog` | 1,000 | 12 |
+| Books Catalog | `books-catalog` | 2,000 | 12 |
 | Workplace Docs | `workplace-docs` | 15 | 16 |
 | Security SIEM | `security-siem` | 301 | 18 |
 | TMDB Movies | `tmdb-movies` | 8,516 | 12 |

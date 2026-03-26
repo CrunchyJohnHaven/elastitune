@@ -446,6 +446,7 @@ export default function ConnectForm({
         <button
           type="button"
           onClick={handleDemo}
+          aria-label="Launch the demo"
           disabled={isLoading}
           style={{
             flex: '1 1 180px',
@@ -489,6 +490,7 @@ export default function ConnectForm({
 
         <button
           type="submit"
+          aria-label={customFieldsOpen ? 'Analyze the search index' : 'Run the benchmark'}
           disabled={isLoading}
           style={{
             flex: '1 1 180px',
@@ -526,7 +528,8 @@ export default function ConnectForm({
         <button
           type="button"
           onClick={handleGuidedTour}
-        disabled={isLoading}
+          aria-label="Start the guided tour"
+          disabled={isLoading}
         style={{
           width: '100%',
           padding: '10px',
@@ -646,6 +649,7 @@ export default function ConnectForm({
                 key={preset.id}
                 type="button"
                 onClick={() => handleLoadBenchmarkPreset(preset.id)}
+                aria-label={`Use the ${preset.label} benchmark preset`}
                 style={{
                   display: 'grid',
                   gridTemplateColumns: '1fr auto',
@@ -1145,6 +1149,7 @@ export default function ConnectForm({
       <div style={{ display: 'flex', gap: 10 }}>
         <button
           type="submit"
+          aria-label={customFieldsOpen ? 'Analyze the search index' : 'Run the benchmark'}
           disabled={isLoading}
           style={{
             flex: 1,
@@ -1189,6 +1194,7 @@ export default function ConnectForm({
         <button
           type="button"
           onClick={handleDemo}
+          aria-label="Launch the demo"
           disabled={isLoading}
           style={{
             flex: 1,
@@ -1226,6 +1232,7 @@ export default function ConnectForm({
       <button
         type="button"
         onClick={handleGuidedTour}
+        aria-label="Start the guided tour"
         disabled={isLoading}
         style={{
           width: '100%',
