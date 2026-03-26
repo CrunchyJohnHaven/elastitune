@@ -1,7 +1,8 @@
-import { Suspense, lazy } from 'react'
+import React, { Suspense, lazy } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import ConnectScreen from './screens/ConnectScreen'
 import CommitteeScreen from './screens/CommitteeScreen'
+import ErrorBoundary from './components/ui/ErrorBoundary'
 
 const RunScreen = lazy(() => import('./screens/RunScreen'))
 const ReportScreen = lazy(() => import('./screens/ReportScreen'))
@@ -30,20 +31,28 @@ function RouteFallback() {
   )
 }
 
+function Guarded({ children }: { children: React.ReactNode }) {
+  return (
+    <ErrorBoundary>
+      <Suspense fallback={<RouteFallback />}>
+        {children}
+      </Suspense>
+    </ErrorBoundary>
+  )
+}
+
 export default function AppRoutes() {
   return (
-    <Suspense fallback={<RouteFallback />}>
-      <Routes>
-        <Route path="/" element={<ConnectScreen />} />
-        <Route path="/committee" element={<CommitteeScreen />} />
-        <Route path="/run/:runId" element={<RunScreen />} />
-        <Route path="/report/:runId" element={<ReportScreen />} />
-        <Route path="/compare/:runId1/:runId2" element={<CompareScreen />} />
-        <Route path="/benchmarks" element={<BenchmarkDashboard />} />
-        <Route path="/committee/run/:runId" element={<CommitteeRunScreen />} />
-        <Route path="/committee/report/:runId" element={<CommitteeReportScreen />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Suspense>
+    <Routes>
+      <Route path="/" element={<Guarded><ConnectScreen /></Guarded>} />
+      <Route path="/committee" element={<Guarded><CommitteeScreen /></Guarded>} />
+      <Route path="/run/:runId" element={<Guarded><RunScreen /></Guarded>} />
+      <Route path="/report/:runId" element={<Guarded><ReportScreen /></Guarded>} />
+      <Route path="/compare/:runId1/:runId2" element={<Guarded><CompareScreen /></Guarded>} />
+      <Route path="/benchmarks" element={<Guarded><BenchmarkDashboard /></Guarded>} />
+      <Route path="/committee/run/:runId" element={<Guarded><CommitteeRunScreen /></Guarded>} />
+      <Route path="/committee/report/:runId" element={<Guarded><CommitteeReportScreen /></Guarded>} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   )
 }
