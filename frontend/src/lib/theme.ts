@@ -14,8 +14,6 @@ export function personaGlowColor(colorSeed: number): string {
 
 export const FONT_UI =
   '"Inter", "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif';
-export const FONT_MONO =
-  '"JetBrains Mono", "SFMono-Regular", "Consolas", monospace';
 
 export const SURFACE_BG = 'rgba(10, 14, 20, 0.78)';
 export const SURFACE_BG_STRONG = 'rgba(5, 7, 11, 0.92)';

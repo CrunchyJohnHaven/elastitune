@@ -8,7 +8,6 @@ import CommitteeSpaceCanvas from '@/components/committee/CommitteeSpaceCanvas';
 import CommitteeRightRail from '@/components/committee/CommitteeRightRail';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
-import SkeletonCard from '@/components/ui/SkeletonCard';
 import { useToast } from '@/components/ui/ToastProvider';
 import { useCommitteeRunSocket } from '@/hooks/useCommitteeRunSocket';
 import { useViewportWidth } from '@/hooks/useViewportWidth';
@@ -108,85 +107,20 @@ export default function CommitteeRunScreen() {
     <ErrorBoundary title="Committee Run Failed">
       <ShellFrame>
         <CommitteeTopBar />
-        {!snapshot && (
-          <div
-            style={{
-              flex: 1,
-              position: 'relative',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background:
-                'radial-gradient(circle at 50% 12%, rgba(77,163,255,0.12) 0%, rgba(8,12,18,0.96) 52%, rgba(5,7,11,1) 100%)',
-            }}
-            >
-              <div
-                style={{
-                  width: 620,
-                  maxWidth: 'calc(100vw - 48px)',
-                  padding: '28px 30px',
-                  borderRadius: 18,
-                  background: 'rgba(8,12,18,0.78)',
-                  border: '1px solid rgba(255,255,255,0.08)',
-                  boxShadow: '0 30px 80px rgba(0,0,0,0.32)',
-                }}
-              >
-                <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: '#6B7480', letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 10 }}>
-                  Committee Launch
-                </div>
-                <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 28, fontWeight: 700, color: '#EEF3FF', marginBottom: 8 }}>
-                  Building the live committee run
-                </div>
-                <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 14, color: '#9AA4B2', lineHeight: 1.6, marginBottom: 18 }}>
-                  Parsing the document, establishing the baseline, then pacing the rewrite loop so you can actually watch the room react section by section.
-                </div>
-                <div style={{ display: 'grid', gap: 12, marginTop: 18 }}>
-                  <SkeletonCard lines={2} height={92} compact />
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
-                    {Array.from({ length: 3 }).map((_, index) => (
-                      <SkeletonCard key={index} lines={1} height={72} compact titleWidth={84} />
-                    ))}
-                  </div>
-                </div>
-                {loadingTimedOut && (
-                  <div style={{ marginTop: 18, display: 'flex', gap: 10 }}>
-                    <button
-                      onClick={() => window.location.reload()}
-                      style={{ padding: '10px 14px', borderRadius: 10, border: 'none', background: '#4DA3FF', color: '#05070B', cursor: 'pointer', fontFamily: 'Inter, sans-serif', fontWeight: 700 }}
-                    >
-                      Retry
-                    </button>
-                    <Link
-                      to="/committee"
-                      style={{ padding: '10px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: '#EEF3FF', textDecoration: 'none', fontFamily: 'Inter, sans-serif', fontWeight: 600 }}
-                    >
-                      Back to Setup
-                    </Link>
-                  </div>
-                )}
-                {loadingTimedOut && (
-                  <div style={{ marginTop: 12, color: '#FBBF24', fontFamily: 'Inter, sans-serif', fontSize: 12 }}>
-                    Connection failed. Check that the backend and WebSocket server are running, then retry.
-                  </div>
-                )}
-              </div>
-            </div>
-        )}
-        {snapshot && (
-          <motion.div
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45, ease: 'easeOut' }}
-            style={{
-              flex: 1,
-              display: 'grid',
-              gridTemplateColumns: isCompact ? 'minmax(0, 1fr)' : '320px minmax(0, 1fr) 360px',
-              gridTemplateRows: isCompact ? 'minmax(420px, 60vh) auto auto' : '1fr',
-              height: isCompact ? 'auto' : 0,
-              minHeight: 0,
-              overflow: isCompact ? 'auto' : 'hidden',
-            }}
-          >
+        <motion.div
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, ease: 'easeOut' }}
+          style={{
+            flex: 1,
+            display: 'grid',
+            gridTemplateColumns: isCompact ? 'minmax(0, 1fr)' : '320px minmax(0, 1fr) 360px',
+            gridTemplateRows: isCompact ? 'minmax(420px, 60vh) auto auto' : '1fr',
+            height: isCompact ? 'auto' : 0,
+            minHeight: 0,
+            overflow: isCompact ? 'auto' : 'hidden',
+          }}
+        >
             {!isCompact && <CommitteeLeftRail />}
             <div style={{ position: 'relative', background: '#05070B', minHeight: isCompact ? 420 : 0 }}>
               <CommitteeSpaceCanvas />
@@ -263,8 +197,7 @@ export default function CommitteeRunScreen() {
             </div>
             {isCompact && <CommitteeLeftRail compact />}
             <CommitteeRightRail compact={isCompact} />
-          </motion.div>
-        )}
+        </motion.div>
       </ShellFrame>
       <ConfirmDialog
         open={showStopConfirm}
