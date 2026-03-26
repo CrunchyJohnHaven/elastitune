@@ -15,6 +15,7 @@ import CompressionSummaryComp from '@/components/report/CompressionSummary';
 import ExperimentTable from '@/components/report/ExperimentTable';
 import { PANEL_BORDER, ACCENT_BLUE } from '@/lib/theme';
 import { buildShareableReportHtml } from '@/lib/reportExport';
+import WalkthroughOverlay from '@/components/walkthrough/WalkthroughOverlay';
 
 export default function ReportScreen() {
   const { runId } = useParams<{ runId: string }>();
@@ -895,6 +896,9 @@ export default function ReportScreen() {
           </div>
         </div>
       </div>
+
+      {/* Walkthrough overlay */}
+      <WalkthroughOverlay />
     </>
   );
 }

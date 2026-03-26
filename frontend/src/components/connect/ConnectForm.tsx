@@ -9,6 +9,7 @@ import type {
   SearchRunListItem,
 } from '@/types/contracts';
 import { PANEL_BORDER, ACCENT_BLUE } from '@/lib/theme';
+import { useWalkthroughStore } from '@/store/useWalkthroughStore';
 import { ELASTIC_PRODUCT_STORE_EVAL_SET } from '@/demo/elasticProductStoreEvalSet';
 import { BOOKS_CATALOG_EVAL_SET } from '@/demo/booksCatalogEvalSet';
 import { WORKPLACE_DOCS_EVAL_SET } from '@/demo/workplaceDocsEvalSet';
@@ -357,6 +358,21 @@ export default function ConnectForm({
       onDemoStart(runResp.runId);
     } catch (err) {
       setError(normalizeErrorMessage(err, 'Could not start the demo.'));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGuidedTour = async () => {
+    setError(null);
+    setIsLoading(true);
+    try {
+      const resp = await api.connect({ mode: 'demo' });
+      const runResp = await api.startRun(resp.connectionId);
+      useWalkthroughStore.getState().startWalkthrough();
+      onDemoStart(runResp.runId);
+    } catch (err) {
+      setError(normalizeErrorMessage(err, 'Could not start the guided tour.'));
     } finally {
       setIsLoading(false);
     }
@@ -1088,6 +1104,45 @@ export default function ConnectForm({
           Launch Demo
         </button>
       </div>
+
+      {/* Guided Tour button */}
+      <button
+        type="button"
+        onClick={handleGuidedTour}
+        disabled={isLoading}
+        style={{
+          width: '100%',
+          padding: '10px',
+          marginTop: 8,
+          background: 'linear-gradient(135deg, rgba(77,163,255,0.08), rgba(124,231,255,0.06))',
+          color: '#7CE7FF',
+          border: '1px solid rgba(124,231,255,0.2)',
+          borderRadius: 8,
+          fontFamily: 'Inter, sans-serif',
+          fontWeight: 500,
+          fontSize: 12,
+          cursor: isLoading ? 'not-allowed' : 'pointer',
+          transition: 'all 0.15s',
+          opacity: isLoading ? 0.5 : 1,
+          letterSpacing: '0.02em',
+        }}
+        onMouseEnter={e => {
+          if (!isLoading) {
+            (e.currentTarget as HTMLButtonElement).style.background =
+              'linear-gradient(135deg, rgba(77,163,255,0.15), rgba(124,231,255,0.1))';
+            (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(124,231,255,0.35)';
+          }
+        }}
+        onMouseLeave={e => {
+          if (!isLoading) {
+            (e.currentTarget as HTMLButtonElement).style.background =
+              'linear-gradient(135deg, rgba(77,163,255,0.08), rgba(124,231,255,0.06))';
+            (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(124,231,255,0.2)';
+          }
+        }}
+      >
+        Guided Tour — 10 steps, plain English
+      </button>
 
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }

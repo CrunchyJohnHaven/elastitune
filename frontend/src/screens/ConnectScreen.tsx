@@ -4,13 +4,14 @@ import { motion } from 'framer-motion';
 import ConnectForm from '@/components/connect/ConnectForm';
 import ClusterSummaryCard from '@/components/connect/ClusterSummaryCard';
 import DemoPreviewCanvas from '@/components/connect/DemoPreviewCanvas';
+import CaseStudyHero from '@/components/connect/CaseStudyHero';
 import RunHistory from '@/components/connect/RunHistory';
 import { useAppStore } from '@/store/useAppStore';
 import { useToast } from '@/components/ui/ToastProvider';
 import { api } from '@/lib/api';
 import type { ConnectionSummary, SearchRunListItem } from '@/types/contracts';
 import { Link } from 'react-router-dom';
-import { PREVIEW_EXPERIMENTS, PREVIEW_PERSONAS } from '@/demo/previewSeed';
+
 
 export default function ConnectScreen() {
   const navigate = useNavigate();
@@ -345,7 +346,7 @@ export default function ConnectScreen() {
         }}
       />
 
-      {/* Right side — animated preview */}
+      {/* Right side — case study hero */}
       <div
         style={{
           flex: 1,
@@ -354,235 +355,15 @@ export default function ConnectScreen() {
           flexDirection: 'column',
         }}
       >
-        {/* Preview overlay content */}
-        <div
-          style={{
-            position: 'absolute',
-            top: 36,
-            left: 36,
-            zIndex: 20,
-            pointerEvents: 'none',
-          }}
-        >
-          <motion.div
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.3, duration: 0.5 }}
-          >
-            <div
-              style={{
-                fontFamily: 'JetBrains Mono, monospace',
-                fontSize: 10,
-                color: 'rgba(154,164,178,0.5)',
-                letterSpacing: '0.12em',
-                textTransform: 'uppercase',
-                marginBottom: 4,
-              }}
-            >
-              Live Preview
-            </div>
-            <div
-              style={{
-                fontFamily: 'Inter, sans-serif',
-                fontWeight: 600,
-                fontSize: 14,
-                color: 'rgba(238,243,255,0.7)',
-              }}
-            >
-              What a run looks like
-            </div>
-          </motion.div>
+        {/* Animated background canvas (dimmed) */}
+        <div style={{ opacity: 0.25 }}>
+          <DemoPreviewCanvas />
         </div>
 
-        <div
-          style={{
-            position: 'absolute',
-            top: 32,
-            right: 32,
-            zIndex: 20,
-            display: 'grid',
-            gridTemplateColumns: 'repeat(2, minmax(120px, 1fr))',
-            gap: 8,
-            pointerEvents: 'none',
-          }}
-        >
-          {PREVIEW_STATS.map(stat => (
-            <motion.div
-              key={stat.label}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: stat.delay, duration: 0.45 }}
-              style={{
-                minWidth: 120,
-                padding: '10px 11px',
-                borderRadius: 9,
-                background: 'rgba(7,10,16,0.72)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                boxShadow: '0 16px 42px rgba(0,0,0,0.22)',
-                backdropFilter: 'blur(8px)',
-              }}
-            >
-              <div
-                style={{
-                  fontFamily: 'JetBrains Mono, monospace',
-                  fontSize: 10,
-                  color: 'rgba(154,164,178,0.55)',
-                  marginBottom: 4,
-                  textTransform: 'uppercase',
-                }}
-              >
-                {stat.label}
-              </div>
-              <div
-                style={{
-                  fontFamily: 'Inter, sans-serif',
-                  fontSize: 16,
-                  fontWeight: 700,
-                  color: stat.color,
-                }}
-              >
-                {stat.value}
-              </div>
-            </motion.div>
-          ))}
-        </div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.45, duration: 0.5 }}
-          style={{
-            position: 'absolute',
-            left: 32,
-            bottom: 90,
-            zIndex: 20,
-            width: 320,
-            maxWidth: 'calc(100% - 64px)',
-            padding: '12px 12px 10px',
-            borderRadius: 10,
-            background: 'rgba(7,10,16,0.78)',
-            border: '1px solid rgba(255,255,255,0.08)',
-            boxShadow: '0 18px 48px rgba(0,0,0,0.24)',
-            backdropFilter: 'blur(10px)',
-            pointerEvents: 'none',
-          }}
-        >
-          <div
-            style={{
-              fontFamily: 'JetBrains Mono, monospace',
-              fontSize: 10,
-              color: 'rgba(154,164,178,0.55)',
-              letterSpacing: '0.12em',
-              textTransform: 'uppercase',
-              marginBottom: 8,
-            }}
-          >
-            Preview change stream
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {PREVIEW_EXPERIMENTS.map((experiment, index) => (
-              <div
-                key={experiment.experimentId}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr auto',
-                  gap: 8,
-                  padding: '7px 8px',
-                  borderRadius: 8,
-                  background: 'rgba(255,255,255,0.03)',
-                  border: '1px solid rgba(255,255,255,0.05)',
-                }}
-              >
-                <div>
-                  <div
-                    style={{
-                      fontFamily: 'JetBrains Mono, monospace',
-                      fontSize: 10,
-                      color: 'rgba(154,164,178,0.6)',
-                      marginBottom: 3,
-                    }}
-                  >
-                    #{String(index + 1).padStart(2, '0')} {experiment.change?.label}
-                  </div>
-                  <div
-                    style={{
-                      fontFamily: 'Inter, sans-serif',
-                      fontSize: 11,
-                      color: 'rgba(238,243,255,0.82)',
-                    }}
-                  >
-                    {experiment.hypothesis}
-                  </div>
-                </div>
-                <div
-                  style={{
-                    fontFamily: 'Inter, sans-serif',
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: experiment.decision === 'kept' ? '#4ADE80' : '#FB7185',
-                    alignSelf: 'center',
-                  }}
-                >
-                  {experiment.deltaPercent && experiment.deltaPercent > 0 ? '+' : ''}
-                  {experiment.deltaPercent?.toFixed(1)}%
-                </div>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-
-        {/* Bottom overlay text */}
-        <div
-          style={{
-            position: 'absolute',
-            bottom: 36,
-            left: 0,
-            right: 0,
-            zIndex: 20,
-            pointerEvents: 'none',
-            textAlign: 'center',
-          }}
-        >
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.6, duration: 0.6 }}
-          >
-            <p
-              style={{
-                fontFamily: 'Inter, sans-serif',
-                fontSize: 12,
-                color: 'rgba(107,116,128,0.6)',
-              }}
-            >
-              {PREVIEW_FEATURES.map((f, i) => (
-                <span key={f}>
-                  {f}
-                  {i < PREVIEW_FEATURES.length - 1 && (
-                    <span style={{ margin: '0 8px', opacity: 0.4 }}>·</span>
-                  )}
-                </span>
-              ))}
-            </p>
-          </motion.div>
-        </div>
-
-        <DemoPreviewCanvas />
+        {/* Case study overlay */}
+        <CaseStudyHero />
       </div>
     </div>
   );
 }
 
-const PREVIEW_FEATURES = [
-  'Try the sample benchmark',
-  'Connect your own search index',
-  'Watch changes get tested live',
-  'Export a before / after report',
-];
-
-const PREVIEW_STATS = [
-  { label: 'Search quality now', value: '0.486', color: '#7CE7FF', delay: 0.35 },
-  { label: 'Improvement found', value: '+17.5%', color: '#4ADE80', delay: 0.4 },
-  { label: 'Test searches', value: '8 queries', color: '#EEF3FF', delay: 0.45 },
-  { label: 'Searcher groups', value: String(PREVIEW_PERSONAS.length), color: '#EEF3FF', delay: 0.5 },
-];

@@ -1,6 +1,7 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
 import { useRunSocket } from '@/hooks/useRunSocket';
+import { useWalkthroughEvents } from '@/hooks/useWalkthroughEvents';
 import { useAppStore } from '@/store/useAppStore';
 import { useToast } from '@/components/ui/ToastProvider';
 import { api } from '@/lib/api';
@@ -11,6 +12,7 @@ import RightRail from '@/components/layout/RightRail';
 import ExplainerPanel from '@/components/run/ExplainerPanel';
 import FishTankCanvas from '@/components/run/FishTankCanvas';
 import RunControlBar from '@/components/run/RunControlBar';
+import WalkthroughOverlay from '@/components/walkthrough/WalkthroughOverlay';
 import ErrorBoundary from '@/components/ui/ErrorBoundary';
 
 export default function RunScreen() {
@@ -18,8 +20,9 @@ export default function RunScreen() {
   const { runSnapshot } = useAppStore();
   const toast = useToast();
 
-  // Connect WebSocket
+  // Connect WebSocket and walkthrough events
   useRunSocket(runId ?? null);
+  useWalkthroughEvents();
 
   const stage = runSnapshot?.stage ?? 'idle';
   const showExplainer = useAppStore(state => state.showExplainer);
@@ -76,6 +79,9 @@ export default function RunScreen() {
         {/* Right rail or explainer */}
         {showExplainer ? <ExplainerPanel /> : <RightRail />}
       </div>
+
+      {/* Walkthrough overlay */}
+      <WalkthroughOverlay />
     </ShellFrame>
   );
 }

@@ -2,6 +2,8 @@
 
 Autonomous Elasticsearch search-profile optimizer with a live mission-control dashboard.
 
+**Live demo:** [elastitune.replit.app](https://elastitune.replit.app/)
+
 ![screenshot placeholder](docs/screenshot.png)
 
 ## What it does
@@ -9,7 +11,10 @@ Autonomous Elasticsearch search-profile optimizer with a live mission-control da
 - Connects to any Elasticsearch index (or a built-in benchmark), then runs controlled experiments across field boosts, match strategy, MSM, fuzziness, hybrid weights, and fusion settings.
 - Keeps only changes that improve nDCG@10, producing a measurable before/after lift with full experiment logs.
 - Streams every experiment result in real time over a single WebSocket — no polling, no database.
-- Includes Committee Mode: simulates a buying-committee of personas to score and iteratively rewrite proposal documents.
+- Includes a **Guided Tour** mode: a 10-step walkthrough that explains every stage in plain English, designed for non-technical stakeholders.
+- Includes **Committee Mode**: simulates a buying-committee of personas to score and iteratively rewrite proposal documents.
+
+> *Elasticsearch is the piano. ElastiTune is the piano tuner.*
 
 ## Quick start
 
@@ -38,6 +43,10 @@ Or with Docker Compose (starts Elasticsearch, backend, and frontend together):
 docker compose up --build
 ```
 
+## Guided Tour
+
+Click **Guided Tour** on the connect screen to launch a 10-step walkthrough that runs a real optimization demo and explains each stage in plain English. Each step pauses with a clear overlay, making it easy to screenshot for executive memos or team presentations.
+
 ## Architecture
 
 - **Backend:** FastAPI (Python 3.11), Pydantic v2, AsyncElasticsearch, numpy/scipy, orjson. Runs on port 8000.
@@ -48,7 +57,7 @@ docker compose up --build
 ## Running tests
 
 ```bash
-# Backend unit tests
+# Backend unit tests (123 tests across 10 files)
 python3 -m pytest backend/tests/ -v
 
 # Backend smoke test (requires running backend)
@@ -70,10 +79,10 @@ python3 benchmarks/setup.py --reset  # wipe and reload
 | Benchmark | Index | Docs | Eval queries |
 |---|---|---:|---:|
 | Product Store | `products-catalog` | 931 | 8 |
-| Books Catalog | `books-catalog` | 2,000 | 12 |
+| Books Catalog | `books-catalog` | 999 | 12 |
 | Workplace Docs | `workplace-docs` | 15 | 16 |
 | Security SIEM | `security-siem` | 301 | 18 |
-| TMDB Movies | `tmdb` | 8,516 | 12 |
+| TMDB Movies | `tmdb-movies` | 8,516 | 12 |
 
 ## Deploy to Replit
 
@@ -84,6 +93,13 @@ bash setup.sh && bash start.sh
 ```
 
 The backend will bind to `0.0.0.0` on the port Replit assigns; update `CORS_ORIGINS` in Secrets to match your Replit dev URL.
+
+## Related projects
+
+| Project | What it does | Link |
+|---|---|---|
+| **AutoResearch** | Give an AI agent a small but real LLM training setup and let it experiment autonomously overnight. | [github.com/karpathy/autoresearch](https://github.com/karpathy/autoresearch) |
+| **MiroFish** | A simple, universal swarm intelligence engine designed for multi-agent prediction tasks. | [github.com/666ghj/MiroFish](https://github.com/666ghj/MiroFish) |
 
 ## Stack
 
