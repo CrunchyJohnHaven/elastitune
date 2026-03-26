@@ -8,6 +8,8 @@ import { PANEL_BORDER } from '@/lib/theme';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { useToast } from '@/components/ui/ToastProvider';
 import { useViewportWidth } from '@/hooks/useViewportWidth';
+import CommitteeReportNarrative from '@/components/committee/CommitteeReportNarrative';
+import CommitteeImplementationGuide from '@/components/committee/CommitteeImplementationGuide';
 
 function sentimentColor(sentiment: string): string {
   switch (sentiment) {
@@ -139,60 +141,6 @@ function ReportSkeleton() {
   );
 }
 
-function diffSlices(before: string, after: string) {
-  let start = 0;
-  const safeBefore = before || '';
-  const safeAfter = after || '';
-  while (start < safeBefore.length && start < safeAfter.length && safeBefore[start] === safeAfter[start]) {
-    start += 1;
-  }
-
-  let beforeEnd = safeBefore.length - 1;
-  let afterEnd = safeAfter.length - 1;
-  while (beforeEnd >= start && afterEnd >= start && safeBefore[beforeEnd] === safeAfter[afterEnd]) {
-    beforeEnd -= 1;
-    afterEnd -= 1;
-  }
-
-  return {
-    beforePrefix: safeBefore.slice(0, start),
-    beforeChanged: safeBefore.slice(start, beforeEnd + 1),
-    beforeSuffix: safeBefore.slice(beforeEnd + 1),
-    afterPrefix: safeAfter.slice(0, start),
-    afterChanged: safeAfter.slice(start, afterEnd + 1),
-    afterSuffix: safeAfter.slice(afterEnd + 1),
-  };
-}
-
-function DiffPreview({ before, after }: { before: string; after: string }) {
-  const slices = diffSlices(before, after);
-
-  return (
-    <div style={{ display: 'grid', gap: 8 }}>
-      <div style={{ padding: '8px 10px', borderRadius: 7, background: 'rgba(251,113,133,0.04)', borderLeft: '2px solid rgba(251,113,133,0.2)' }}>
-        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 8, color: '#FB7185', letterSpacing: '0.1em', marginBottom: 4 }}>
-          ORIGINAL
-        </div>
-        <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, color: '#9AA4B2', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>
-          {slices.beforePrefix}
-          {slices.beforeChanged && <mark style={{ background: 'rgba(251,113,133,0.12)', color: '#FECDD3', padding: 0 }}>{slices.beforeChanged}</mark>}
-          {slices.beforeSuffix}
-        </div>
-      </div>
-      <div style={{ padding: '8px 10px', borderRadius: 7, background: 'rgba(74,222,128,0.04)', borderLeft: '2px solid rgba(74,222,128,0.2)' }}>
-        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 8, color: '#4ADE80', letterSpacing: '0.1em', marginBottom: 4 }}>
-          OPTIMIZED
-        </div>
-        <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, color: '#C5CDD8', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>
-          {slices.afterPrefix}
-          {slices.afterChanged && <mark style={{ background: 'rgba(74,222,128,0.14)', color: '#D9F99D', padding: 0 }}>{slices.afterChanged}</mark>}
-          {slices.afterSuffix}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function CommitteeReportScreen() {
   const { runId } = useParams<{ runId: string }>();
   const toast = useToast();
@@ -316,6 +264,8 @@ export default function CommitteeReportScreen() {
             </div>
           )}
 
+          <CommitteeReportNarrative report={report} exportPayload={exportPayload} />
+
           <div style={{ display: 'grid', gridTemplateColumns: isNarrow ? 'repeat(2, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))', gap: 12, marginBottom: 24 }}>
             <KpiCard label="Baseline Score" value={formatScore(report.summary.baselineScore)} color="#9AA4B2" />
             <KpiCard label="Best Score" value={formatScore(report.summary.bestScore)} color="#4DA3FF" />
@@ -323,7 +273,7 @@ export default function CommitteeReportScreen() {
             <KpiCard label="Rewrites Accepted" value={`${report.summary.acceptedRewrites}/${report.summary.rewritesTested}`} color="#EEF3FF" sub={`${report.summary.rewritesTested - report.summary.acceptedRewrites} reverted`} />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: isNarrow ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 12, marginBottom: 24 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isNarrow ? 'repeat(2, minmax(0, 1fr))' : 'repeat(3, minmax(0, 1fr))', gap: 12, marginBottom: 24 }}>
             <KpiCard label="Industry" value={String(exportPayload.committeeSummary.industryLabel ?? 'General Enterprise')} />
             <KpiCard label="AI Coverage" value={`${Number(exportPayload.committeeSummary.llmCoveragePct ?? 0).toFixed(0)}%`} />
             <KpiCard label="Scoring Mode" value={String(exportPayload.committeeSummary.evaluationMode ?? report.evaluationMode).replace(/_/g, ' ')} />
@@ -331,19 +281,11 @@ export default function CommitteeReportScreen() {
 
           <div style={{ display: 'grid', gridTemplateColumns: isNarrow ? '1fr' : '1.08fr 0.92fr', gap: 18 }}>
             <div>
-              <div style={{ padding: '16px 18px', borderRadius: 14, background: 'rgba(10,14,20,0.76)', border: `1px solid ${PANEL_BORDER}` }}>
-                <SectionCard label="Before / After Sections" />
-                <div style={{ display: 'grid', gap: 10 }}>
-                  {exportPayload.sections.map(section => (
-                    <div key={section.sectionId} style={{ padding: '12px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: `1px solid ${PANEL_BORDER}` }}>
-                      <div style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700, fontSize: 12, color: '#EEF3FF', marginBottom: 8 }}>
-                        {section.sectionId}. {section.title}
-                      </div>
-                      <DiffPreview before={section.originalContent.slice(0, 420)} after={section.optimizedContent.slice(0, 420)} />
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <CommitteeImplementationGuide
+                guide={report.implementationGuide}
+                sections={exportPayload.sections}
+                actionableFeedback={exportPayload.llmHandoff.actionableSectionFeedback}
+              />
             </div>
 
             <div style={{ display: 'grid', gap: 18, alignContent: 'start' }}>
@@ -405,6 +347,40 @@ export default function CommitteeReportScreen() {
                   {report.rewrites.length > 12 && (
                     <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, color: '#4B5563', textAlign: 'center', padding: '6px 0', fontStyle: 'italic' }}>
                       + {report.rewrites.length - 12} more in Export JSON
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ padding: '16px 18px', borderRadius: 14, background: 'rgba(10,14,20,0.76)', border: `1px solid ${PANEL_BORDER}` }}>
+                <SectionCard label="Export Handoff" />
+                <div style={{ display: 'grid', gap: 10 }}>
+                  <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 12, color: '#C5CDD8', lineHeight: 1.6 }}>
+                    {exportPayload.llmHandoff.task ?? 'Use the export handoff to rewrite the document for the committee.'}
+                  </div>
+
+                  {exportPayload.llmHandoff.rewriteGoals && exportPayload.llmHandoff.rewriteGoals.length > 0 && (
+                    <div style={{ display: 'grid', gap: 6 }}>
+                      <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: '#6B7480', letterSpacing: '0.14em', textTransform: 'uppercase' }}>
+                        Rewrite goals
+                      </div>
+                      {exportPayload.llmHandoff.rewriteGoals.slice(0, 4).map(goal => (
+                        <div key={goal} style={{ padding: '9px 10px', borderRadius: 8, background: 'rgba(77,163,255,0.05)', border: '1px solid rgba(77,163,255,0.12)', fontFamily: 'Inter, sans-serif', fontSize: 11, color: '#D7DEE8', lineHeight: 1.5 }}>
+                          {goal}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
+                    <KpiCard label="AI Eval" value={String(exportPayload.committeeSummary.aiEvaluations ?? 0)} />
+                    <KpiCard label="Heuristics" value={String(exportPayload.committeeSummary.heuristicEvaluations ?? 0)} />
+                    <KpiCard label="LLM Coverage" value={`${Number(exportPayload.committeeSummary.llmCoveragePct ?? 0).toFixed(0)}%`} />
+                  </div>
+
+                  {exportPayload.llmHandoff.suggestedPrompt && (
+                    <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, color: '#9AA4B2', lineHeight: 1.55 }}>
+                      Suggested prompt: {exportPayload.llmHandoff.suggestedPrompt}
                     </div>
                   )}
                 </div>

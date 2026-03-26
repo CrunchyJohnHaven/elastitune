@@ -147,6 +147,66 @@ export interface CommitteeSummary {
   industryLabel: string;
 }
 
+export interface CommitteeNarrativeSection {
+  key: string;
+  title: string;
+  body: string;
+  audience?: 'executive' | 'operator' | 'technical';
+  source?: 'deterministic' | 'llm';
+  confidence?: number | null;
+}
+
+export interface CommitteePersonaSummary {
+  personaCount: number;
+  archetypeCounts: Record<string, number>;
+  topRoles: string[];
+  explanation: string;
+}
+
+export interface CommitteeChangeNarrative {
+  sectionId?: number | null;
+  sectionTitle?: string | null;
+  title: string;
+  plainEnglish: string;
+  before: string;
+  after: string;
+  expectedEffect: string;
+  whyItHelped: string;
+  confidence?: number | null;
+  evidence: string[];
+}
+
+export interface CommitteeCodeLine {
+  lineNumber: number;
+  content: string;
+  changed?: boolean;
+  explanation?: string | null;
+}
+
+export interface CommitteeCodeSnippet {
+  title: string;
+  target: string;
+  format: string;
+  summary: string;
+  beforeLines: CommitteeCodeLine[];
+  afterLines: CommitteeCodeLine[];
+}
+
+export interface CommitteeImplementationGuide {
+  summary: string;
+  applyInstructions: string[];
+  representativeSection?: string | null;
+  note?: string | null;
+  snippets: CommitteeCodeSnippet[];
+}
+
+export interface CommitteeValidationNote {
+  title: string;
+  body: string;
+  severity: 'success' | 'info' | 'warning';
+  confidence?: number | null;
+}
+
 export interface CommitteeConnectionResponse {
   connectionId: string;
   productMode: 'committee';
@@ -183,10 +243,17 @@ export interface CommitteeReport {
     improvementPct: number;
     rewritesTested: number;
     acceptedRewrites: number;
+    personaCount?: number | null;
+    confidenceScore?: number | null;
   };
   document: CommitteeDocument;
   personas: CommitteePersonaView[];
   rewrites: RewriteAttempt[];
+  narrative?: CommitteeNarrativeSection[];
+  personaSummary?: CommitteePersonaSummary | null;
+  changeNarratives?: CommitteeChangeNarrative[];
+  implementationGuide?: CommitteeImplementationGuide | null;
+  validationNotes?: CommitteeValidationNote[];
   evaluationMode: CommitteeEvaluationMode;
   warnings: string[];
 }
