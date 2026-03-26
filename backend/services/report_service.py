@@ -141,6 +141,7 @@ class ReportService:
                 originalBaselineScore=original_baseline if is_continuation else None,
                 totalExperimentsRun=total_experiments if is_continuation else None,
                 totalImprovementsKept=total_kept_all if is_continuation else None,
+                modelId=ctx.best_profile.modelId if ctx.best_profile.modelId else None,
             ),
             connection=ctx.summary,
             connectionConfig=ReportConnectionConfig(

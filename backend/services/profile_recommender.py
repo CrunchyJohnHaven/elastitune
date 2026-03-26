@@ -27,6 +27,9 @@ class ProfileRecommender:
 
         best_profile = SearchProfile.model_validate(benchmark["best_profile"])
         recommended = baseline_profile.model_copy(deep=True)
+        # Preserve modelId from baseline if set; it travels with the profile through tuning
+        if baseline_profile.vectorField and baseline_profile.modelId:
+            recommended.modelId = baseline_profile.modelId
         recommended.multiMatchType = best_profile.multiMatchType
         recommended.minimumShouldMatch = best_profile.minimumShouldMatch
         recommended.tieBreaker = best_profile.tieBreaker

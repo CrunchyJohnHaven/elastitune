@@ -50,6 +50,7 @@ class ReportSummary(BaseModel):
     improvementsKept: int
     durationSeconds: float = 0.0
     projectedMonthlySavingsUsd: Optional[float] = None
+    modelId: Optional[str] = None  # Embedding model used in the best profile
     # Continuation tracking — populated when this run continued from a previous one
     isContinuation: bool = False
     originalBaselineScore: Optional[float] = None

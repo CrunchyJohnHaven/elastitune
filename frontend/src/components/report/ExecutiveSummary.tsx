@@ -159,6 +159,29 @@ export default function ExecutiveSummary({ report }: ExecutiveSummaryProps) {
             {report.runId}
           </span>{' '}
           · Elapsed {formatDuration(summary.durationSeconds)}
+          {summary.modelId && (
+            <>
+              {' · '}
+              <span
+                style={{
+                  fontFamily: 'Inter, sans-serif',
+                  fontSize: 11,
+                  color: '#9AA4B2',
+                }}
+              >
+                Model:{' '}
+              </span>
+              <span
+                style={{
+                  fontFamily: 'JetBrains Mono, monospace',
+                  fontSize: 11,
+                  color: '#7CE7FF',
+                }}
+              >
+                {summary.modelId}
+              </span>
+            </>
+          )}
         </p>
       </div>
 

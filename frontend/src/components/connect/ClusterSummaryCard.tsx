@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
-import type { ConnectionSummary, SearchRunListItem } from '@/types/contracts';
+import { ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import type { ConnectionSummary, ModelComparisonResult, SearchRunListItem } from '@/types/contracts';
 import { formatDocCount } from '@/lib/format';
 import { PANEL_BORDER, ACCENT_BLUE } from '@/lib/theme';
+import { api } from '@/lib/api';
+import ModelComparisonCard from './ModelComparisonCard';
 
 interface RunLaunchOptions {
   durationMinutes: number;
@@ -76,6 +78,35 @@ export default function ClusterSummaryCard({
   const [autoStopOnPlateau, setAutoStopOnPlateau] = useState(true);
   const [tuneOpen, setTuneOpen] = useState(false);
   const isBenchmarkTarget = summary.indexName === 'products-catalog';
+
+  // Model comparison state
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [modelIdsInput, setModelIdsInput] = useState('');
+  const [compareLoading, setCompareLoading] = useState(false);
+  const [compareError, setCompareError] = useState<string | null>(null);
+  const [compareResult, setCompareResult] = useState<ModelComparisonResult | null>(null);
+
+  async function handleCompareModels() {
+    const modelIds = modelIdsInput
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean);
+    if (!modelIds.length) {
+      setCompareError('Enter at least one model ID.');
+      return;
+    }
+    setCompareError(null);
+    setCompareResult(null);
+    setCompareLoading(true);
+    try {
+      const result = await api.compareModels(connectionId, modelIds);
+      setCompareResult(result);
+    } catch (err) {
+      setCompareError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setCompareLoading(false);
+    }
+  }
 
   return (
     <div
@@ -469,6 +500,128 @@ export default function ClusterSummaryCard({
           </div>
         )}
       </div>
+
+      {/* Compare Embedding Models — only shown when a vector field is present */}
+      {summary.vectorField && (
+        <div style={{ marginBottom: 14 }}>
+          <button
+            type="button"
+            onClick={() => setCompareOpen(o => !o)}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              background: 'none',
+              border: '1px solid rgba(255,255,255,0.07)',
+              borderRadius: 7,
+              padding: '8px 12px',
+              cursor: 'pointer',
+              color: '#6B7480',
+              fontFamily: 'Inter, sans-serif',
+              fontSize: 11,
+              fontWeight: 500,
+            }}
+          >
+            <span>Compare Embedding Models</span>
+            {compareOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </button>
+
+          {compareOpen && (
+            <div
+              style={{
+                marginTop: 8,
+                padding: '12px',
+                background: 'rgba(255,255,255,0.02)',
+                borderRadius: 8,
+                border: '1px solid rgba(255,255,255,0.06)',
+              }}
+            >
+              <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+              <div
+                style={{
+                  fontFamily: 'Inter, sans-serif',
+                  fontSize: 11,
+                  color: '#9AA4B2',
+                  marginBottom: 8,
+                  lineHeight: 1.5,
+                }}
+              >
+                Enter comma-separated Elasticsearch model IDs to benchmark each model and find the best fit for your index.
+              </div>
+
+              <input
+                type="text"
+                placeholder=".elser_model_2, .multilingual-e5-small"
+                value={modelIdsInput}
+                onChange={e => setModelIdsInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && !compareLoading) handleCompareModels();
+                }}
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  padding: '9px 11px',
+                  background: 'rgba(255,255,255,0.03)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: 6,
+                  color: '#EEF3FF',
+                  fontFamily: 'JetBrains Mono, monospace',
+                  fontSize: 11,
+                  outline: 'none',
+                  marginBottom: 8,
+                }}
+              />
+
+              <button
+                type="button"
+                onClick={handleCompareModels}
+                disabled={compareLoading || !modelIdsInput.trim()}
+                style={{
+                  width: '100%',
+                  padding: '9px',
+                  background: compareLoading || !modelIdsInput.trim()
+                    ? 'rgba(74,222,128,0.15)'
+                    : 'rgba(74,222,128,0.2)',
+                  color: compareLoading || !modelIdsInput.trim() ? '#4B5563' : '#4ADE80',
+                  border: '1px solid rgba(74,222,128,0.25)',
+                  borderRadius: 7,
+                  fontFamily: 'Inter, sans-serif',
+                  fontWeight: 600,
+                  fontSize: 12,
+                  cursor: compareLoading || !modelIdsInput.trim() ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                }}
+              >
+                {compareLoading && <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />}
+                {compareLoading ? 'Comparing models…' : 'Compare Models'}
+              </button>
+
+              {compareError && (
+                <div
+                  style={{
+                    marginTop: 8,
+                    padding: '8px 10px',
+                    background: 'rgba(251,113,133,0.08)',
+                    border: '1px solid rgba(251,113,133,0.2)',
+                    borderRadius: 6,
+                    fontFamily: 'Inter, sans-serif',
+                    fontSize: 11,
+                    color: '#FB7185',
+                  }}
+                >
+                  {compareError}
+                </div>
+              )}
+
+              {compareResult && <ModelComparisonCard result={compareResult} />}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* CTA */}
       <button
