@@ -63,6 +63,19 @@ class TestDemoServiceCreateConnection:
         assert conn.baseline_profile is not None
         assert len(conn.baseline_profile.lexicalFields) > 0
 
+    def test_demo_connection_is_hermetic_and_uses_bundled_assets(self) -> None:
+        svc = DemoService()
+        conn = svc.create_connection("conn_demo_assets")
+
+        assert conn.mode == "demo"
+        assert conn.es_url is None
+        assert conn.api_key is None
+        assert conn.index_name == conn.summary.indexName
+        assert len(conn.sample_docs) == len(conn.summary.sampleDocs)
+        assert len(conn.sample_docs) > 0
+        assert {"id", "title", "excerpt", "fieldPreview"} <= set(conn.sample_docs[0].keys())
+        assert all("esUrl" not in doc and "apiKey" not in doc for doc in conn.sample_docs)
+
 
 class TestDemoServiceExperiments:
     """Tests for demo experiments data."""

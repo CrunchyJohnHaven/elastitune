@@ -586,6 +586,34 @@ class DemoService:
         self._report_data: Optional[Dict[str, Any]] = _load_demo_json(
             "demo_report.json"
         )
+        self._validate_demo_payload()
+
+    def _validate_demo_payload(self) -> None:
+        """
+        Keep demo mode hermetic.
+
+        The bundled demo assets should never contain live Elasticsearch connection
+        details or a remote index reference. If that ever happens, fail loudly at
+        startup instead of quietly pointing the demo flow at production data.
+        """
+        forbidden_keys = {"esUrl", "apiKey", "indexUrl", "host"}
+        unexpected = forbidden_keys.intersection(self._connection_data)
+        if unexpected:
+            raise ValueError(
+                f"Demo connection payload must not contain live connection fields: {sorted(unexpected)}"
+            )
+
+        index_name = str(self._connection_data.get("indexName", "")).strip()
+        if not index_name:
+            raise ValueError("Demo connection payload is missing an indexName")
+        if index_name.startswith(("http://", "https://")):
+            raise ValueError(
+                f"Demo indexName must be a local demo index, got {index_name!r}"
+            )
+
+        sample_docs = self._connection_data.get("sampleDocs", [])
+        if not isinstance(sample_docs, list) or not sample_docs:
+            raise ValueError("Demo connection payload must include bundled sampleDocs")
 
     # ------------------------------------------------------------------
     # Connection
@@ -593,6 +621,8 @@ class DemoService:
 
     def create_connection(self, connection_id: str) -> ConnectionContext:
         summary = ConnectionSummary(**self._connection_data)
+        # Demo mode is intentionally self-contained: never forward live ES fields.
+        demo_sample_docs = [doc.model_dump() for doc in summary.sampleDocs]
 
         # Build a simple baseline eval set
         eval_set = [
@@ -642,7 +672,7 @@ class DemoService:
             api_key=None,
             index_name=summary.indexName,
             text_fields=list(summary.primaryTextFields),
-            sample_docs=[],
+            sample_docs=demo_sample_docs,
         )
 
     # ------------------------------------------------------------------
