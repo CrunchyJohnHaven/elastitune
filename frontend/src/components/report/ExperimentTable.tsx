@@ -14,9 +14,10 @@ export default function ExperimentTable({
   title = 'Experiments',
   filterKept,
 }: ExperimentTableProps) {
+  const safeExperiments = experiments ?? [];
   const rows = filterKept
-    ? experiments.filter(e => e.decision === 'kept')
-    : experiments;
+    ? safeExperiments.filter(e => e.decision === 'kept')
+    : safeExperiments;
 
   const thStyle: React.CSSProperties = {
     fontFamily: 'Inter, sans-serif',
