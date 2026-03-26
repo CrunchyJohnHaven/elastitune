@@ -63,7 +63,13 @@ INDUSTRY_PROFILES: Dict[str, IndustryProfile] = {
             ),
             IndustryRiskRule(
                 flag_text="Procurement path is unclear.",
-                absent_terms=("carahsoft", "naspo", "procurement", "vehicle", "solicitation"),
+                absent_terms=(
+                    "carahsoft",
+                    "naspo",
+                    "procurement",
+                    "vehicle",
+                    "solicitation",
+                ),
                 persona_keywords=("budget", "procurement", "finance", "omb"),
             ),
             IndustryRiskRule(
@@ -98,11 +104,22 @@ INDUSTRY_PROFILES: Dict[str, IndustryProfile] = {
             "self-managed",
         ),
         social_proof_types=("internal", "external", "peer_company", "analyst_report"),
-        specificity_values=("general", "role_tailored", "vertical_tailored", "hyper_specific"),
+        specificity_values=(
+            "general",
+            "role_tailored",
+            "vertical_tailored",
+            "hyper_specific",
+        ),
         risk_rules=(
             IndustryRiskRule(
                 flag_text="Integration and transition plan are underspecified.",
-                absent_terms=("migration", "phased", "integration", "cutover", "transition"),
+                absent_terms=(
+                    "migration",
+                    "phased",
+                    "integration",
+                    "cutover",
+                    "transition",
+                ),
                 persona_keywords=("technology", "platform", "cto", "cio"),
             ),
             IndustryRiskRule(
@@ -117,7 +134,12 @@ INDUSTRY_PROFILES: Dict[str, IndustryProfile] = {
             ),
             IndustryRiskRule(
                 flag_text="Security and compliance responsibilities remain unclear.",
-                absent_terms=("security", "compliance", "shared responsibility", "audit"),
+                absent_terms=(
+                    "security",
+                    "compliance",
+                    "shared responsibility",
+                    "audit",
+                ),
                 persona_keywords=("security", "risk", "compliance", "ciso"),
             ),
         ),
@@ -144,7 +166,12 @@ INDUSTRY_PROFILES: Dict[str, IndustryProfile] = {
             "wealth",
         ),
         social_proof_types=("internal", "external", "peer_company", "analyst_report"),
-        specificity_values=("general", "role_tailored", "vertical_tailored", "hyper_specific"),
+        specificity_values=(
+            "general",
+            "role_tailored",
+            "vertical_tailored",
+            "hyper_specific",
+        ),
         risk_rules=(
             IndustryRiskRule(
                 flag_text="Control framework and audit trail need stronger detail.",
@@ -179,7 +206,12 @@ INDUSTRY_PROFILES: Dict[str, IndustryProfile] = {
             "clinical operations",
         ),
         social_proof_types=("internal", "external", "peer_company", "analyst_report"),
-        specificity_values=("general", "role_tailored", "vertical_tailored", "hyper_specific"),
+        specificity_values=(
+            "general",
+            "role_tailored",
+            "vertical_tailored",
+            "hyper_specific",
+        ),
         risk_rules=(
             IndustryRiskRule(
                 flag_text="Clinical workflow impact is not concrete enough.",
@@ -205,7 +237,12 @@ INDUSTRY_PROFILES: Dict[str, IndustryProfile] = {
         label="General Enterprise",
         detection_terms=(),
         social_proof_types=("internal", "external", "peer_company", "analyst_report"),
-        specificity_values=("general", "role_tailored", "vertical_tailored", "hyper_specific"),
+        specificity_values=(
+            "general",
+            "role_tailored",
+            "vertical_tailored",
+            "hyper_specific",
+        ),
         risk_rules=(
             IndustryRiskRule(
                 flag_text="Implementation path is too vague.",
@@ -245,7 +282,9 @@ def detect_industry_profile(texts: Iterable[str]) -> IndustryProfile:
         score = sum(1 for token in profile.detection_terms if token in corpus)
         scored.append((score, profile_id))
 
-    best_score, best_id = max(scored, key=lambda item: item[0], default=(0, "general_enterprise"))
+    best_score, best_id = max(
+        scored, key=lambda item: item[0], default=(0, "general_enterprise")
+    )
     if best_score <= 0:
         return INDUSTRY_PROFILES["general_enterprise"]
     return INDUSTRY_PROFILES[best_id]

@@ -47,7 +47,7 @@ const BENCHMARK_PRESETS: BenchmarkPreset[] = [
   {
     id: 'workplace',
     label: 'Workplace Docs',
-    description: 'HR policies & company docs — 15 docs, 12 queries',
+    description: 'HR policies & company docs — 15 docs, 16 queries',
     indexName: 'workplace-docs',
     evalSet: WORKPLACE_DOCS_EVAL_SET,
     docCount: '15',

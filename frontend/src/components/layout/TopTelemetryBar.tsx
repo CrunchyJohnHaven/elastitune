@@ -202,8 +202,14 @@ export default function TopTelemetryBar() {
   }, []);
 
   const ndcgValue = metrics ? formatScore(metrics.currentScore) : '—';
+  const totalKept = metrics
+    ? metrics.improvementsKept + (metrics.priorImprovementsKept ?? 0)
+    : 0;
+  const totalRun = metrics
+    ? metrics.experimentsRun + (metrics.priorExperimentsRun ?? 0)
+    : 0;
   const keptRun = metrics
-    ? `${metrics.improvementsKept} / ${metrics.experimentsRun}`
+    ? `${totalKept} / ${totalRun}`
     : '— / —';
   const winPct = metrics
     ? `${(metrics.personaSuccessRate * 100).toFixed(0)}%`
@@ -222,12 +228,14 @@ export default function TopTelemetryBar() {
     : 0;
   const elapsed = metrics ? formatDuration(elapsedSeconds) : '—';
   const queriesTested = summary && metrics
-    ? formatQueriesTested(summary.baselineEvalCount, metrics.experimentsRun, metrics.baselineScore)
+    ? formatQueriesTested(summary.baselineEvalCount, totalRun, metrics.baselineScore)
     : '—';
   const clusterName = summary?.clusterName ? truncate(summary.clusterName, 18) : '—';
   const eta = metrics && runConfig
     ? (() => {
-      if (stage === 'completed') return '0s';
+      if (stage === 'completed') return 'Done';
+      if (stage === 'stopping') return 'Stopping';
+      if (stage !== 'running') return '—';
       const remainingDuration = Math.max((runConfig.durationMinutes * 60) - elapsedSeconds, 0);
       const avgExperimentSeconds = metrics.experimentsRun > 0
         ? elapsedSeconds / metrics.experimentsRun
@@ -316,14 +324,18 @@ export default function TopTelemetryBar() {
         <TelemetryBlock label="KEPT / RUN" value={keptRun} />
         <TelemetryBlock label="PERSONA WIN%" value={winPct} />
         <TelemetryBlock
-          label="SAVINGS"
-          value={savings}
+          label="GAIN"
+          value={metrics?.improvementPct != null && metrics.improvementPct !== 0
+            ? `+${metrics.improvementPct.toFixed(1)}%`
+            : savings !== '—' ? savings : '—'}
           valueStyle={
-            savings !== '—'
+            metrics?.improvementPct != null && metrics.improvementPct > 0
+              ? { color: '#4ADE80' }
+              : savings !== '—'
               ? { color: '#4ADE80' }
               : { color: TEXT_DIM }
           }
-          dimmed={savings === '—'}
+          dimmed={(!metrics?.improvementPct || metrics.improvementPct === 0) && savings === '—'}
         />
         <TelemetryBlock label="ELAPSED" value={elapsed} />
         <TelemetryBlock label="ETA" value={eta} dimmed={eta === '—'} />

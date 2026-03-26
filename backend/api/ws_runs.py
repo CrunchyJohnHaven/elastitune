@@ -5,7 +5,7 @@ import logging
 from typing import Optional
 
 import orjson
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, WebSocketException, status
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
 
 from ..services.run_manager import RunManager
 
@@ -43,9 +43,14 @@ async def ws_run_events(websocket: WebSocket, run_id: str) -> None:
         # Send the current snapshot immediately so the client has a consistent
         # starting state before streaming delta events.
         if snapshot:
+            sanitized_snapshot = (
+                snapshot.sanitize_for_client()
+                if hasattr(snapshot, "sanitize_for_client")
+                else snapshot
+            )
             initial_event = {
                 "type": "snapshot",
-                "payload": snapshot.model_dump(),
+                "payload": sanitized_snapshot.model_dump(),
             }
             await websocket.send_text(orjson.dumps(initial_event).decode())
 
@@ -74,7 +79,9 @@ async def ws_run_events(websocket: WebSocket, run_id: str) -> None:
                 await websocket.send_text(orjson.dumps(event).decode())
 
                 # If the run has finished, drain remaining events and close
-                if event.get("type") == "run.stage" and event.get("payload", {}).get("stage") in (
+                if event.get("type") == "run.stage" and event.get("payload", {}).get(
+                    "stage"
+                ) in (
                     "completed",
                     "error",
                 ):
@@ -88,7 +95,9 @@ async def ws_run_events(websocket: WebSocket, run_id: str) -> None:
                                 "type": "run.complete",
                                 "payload": {
                                     "runId": run_id,
-                                    "stage": event.get("payload", {}).get("stage", "completed"),
+                                    "stage": event.get("payload", {}).get(
+                                        "stage", "completed"
+                                    ),
                                 },
                             }
                         ).decode()
@@ -112,7 +121,10 @@ async def ws_run_events(websocket: WebSocket, run_id: str) -> None:
                             orjson.dumps(
                                 {
                                     "type": "run.complete",
-                                    "payload": {"runId": run_id, "stage": updated_stage},
+                                    "payload": {
+                                        "runId": run_id,
+                                        "stage": updated_stage,
+                                    },
                                 }
                             ).decode()
                         )

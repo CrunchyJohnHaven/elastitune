@@ -138,11 +138,14 @@ export default function ExplainerPanel() {
   const searchProfile = snapshot?.searchProfile;
   const recommendedProfile = snapshot?.recommendedProfile;
 
-  const experimentsRun = metrics?.experimentsRun ?? 0;
-  const kept = metrics?.improvementsKept ?? 0;
-  const baselineScore = metrics?.baselineScore ?? 0;
+  const experimentsRun = (metrics?.experimentsRun ?? 0) + (metrics?.priorExperimentsRun ?? 0);
+  const kept = (metrics?.improvementsKept ?? 0) + (metrics?.priorImprovementsKept ?? 0);
+  // When continuing, show the ORIGINAL baseline so the user sees cumulative progress
+  const originalBaseline = metrics?.originalBaselineScore;
+  const baselineScore = originalBaseline != null ? originalBaseline : (metrics?.baselineScore ?? 0);
   const bestScore = metrics?.bestScore ?? 0;
   const improvementPct = metrics?.improvementPct ?? 0;
+  const isContinued = originalBaseline != null;
   const keptExperiments = experiments.filter(e => e.decision === 'kept');
 
   // Build a summary of what actually changed
@@ -367,7 +370,7 @@ export default function ExplainerPanel() {
                 <strong style={{ color: '#EEF3FF' }}>{indexName}</strong> ({docCount.toLocaleString()} docs)
                 from <span style={{ color: '#FB7185', fontFamily: 'JetBrains Mono, monospace', fontSize: 12 }}>{baselineScore.toFixed(3)}</span> to{' '}
                 <span style={{ color: '#4ADE80', fontFamily: 'JetBrains Mono, monospace', fontSize: 12 }}>{bestScore.toFixed(3)}</span> nDCG@10
-                across {evalCount} test queries.
+                across {evalCount} test queries.{isContinued && ' (cumulative across runs)'}
               </p>
             </>
           ) : stage === 'running' ? (
@@ -390,7 +393,7 @@ export default function ExplainerPanel() {
         {/* Score comparison */}
         {!isPreRun && baselineScore > 0 && (
           <Section icon="1" iconColor={ACCENT_BLUE} title="Search Quality Score">
-            <ScoreBar label="Baseline (before)" score={baselineScore} />
+            <ScoreBar label={isContinued ? "Original baseline" : "Baseline (before)"} score={baselineScore} />
             <ScoreBar label={stage === 'running' ? 'Current best' : 'After optimization'} score={bestScore} />
             <div
               style={{
@@ -532,7 +535,7 @@ export default function ExplainerPanel() {
                       marginTop: 3,
                     }}
                   >
-                    {exp.baselineScore.toFixed(4)} {'\u2192'} {exp.candidateScore.toFixed(4)} nDCG@10
+                    {(exp.beforeScore ?? exp.baselineScore ?? 0).toFixed(4)} {'\u2192'} {exp.candidateScore.toFixed(4)} nDCG@10
                   </div>
                 </div>
               ))}

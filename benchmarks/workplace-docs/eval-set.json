@@ -1,86 +1,114 @@
 [
   {
     "id": "wp_eval_001",
-    "query": "vacation time off policy",
-    "relevantDocIds": ["5"],
-    "difficulty": "easy",
-    "personaHint": "HR employee"
-  },
-  {
-    "id": "wp_eval_002",
-    "query": "health insurance benefits",
-    "relevantDocIds": ["15"],
-    "difficulty": "hard",
-    "personaHint": "new hire"
-  },
-  {
-    "id": "wp_eval_003",
-    "query": "work from home remote policy",
-    "relevantDocIds": ["1", "3", "2"],
-    "difficulty": "easy",
+    "query": "how many days can I work from home",
+    "relevantDocIds": ["1", "2", "3"],
+    "difficulty": "medium",
     "personaHint": "remote employee"
   },
   {
+    "id": "wp_eval_002",
+    "query": "what happens to my PTO when I quit",
+    "relevantDocIds": ["5"],
+    "difficulty": "hard",
+    "personaHint": "departing employee"
+  },
+  {
+    "id": "wp_eval_003",
+    "query": "who owns the code I write on weekends",
+    "relevantDocIds": ["8"],
+    "difficulty": "hard",
+    "personaHint": "software engineer"
+  },
+  {
     "id": "wp_eval_004",
-    "query": "salary compensation framework",
-    "relevantDocIds": ["13", "11"],
+    "query": "can I bring my dog to the office",
+    "relevantDocIds": ["10"],
     "difficulty": "medium",
-    "personaHint": "engineering manager"
+    "personaHint": "office worker"
   },
   {
     "id": "wp_eval_005",
-    "query": "new employee onboarding guide",
-    "relevantDocIds": ["15"],
-    "difficulty": "easy",
-    "personaHint": "new hire"
+    "query": "how do I get promoted to senior engineer",
+    "relevantDocIds": ["6", "11"],
+    "difficulty": "hard",
+    "personaHint": "software engineer"
   },
   {
     "id": "wp_eval_006",
-    "query": "intellectual property agreement",
-    "relevantDocIds": ["8"],
-    "difficulty": "easy",
-    "personaHint": "legal"
-  },
-  {
-    "id": "wp_eval_007",
-    "query": "sales strategy goals targets",
-    "relevantDocIds": ["4", "7", "12"],
-    "difficulty": "medium",
+    "query": "what are our revenue targets this year",
+    "relevantDocIds": ["4", "12"],
+    "difficulty": "hard",
     "personaHint": "sales manager"
   },
   {
+    "id": "wp_eval_007",
+    "query": "report harassment or bullying at work",
+    "relevantDocIds": ["9"],
+    "difficulty": "hard",
+    "personaHint": "concerned employee"
+  },
+  {
     "id": "wp_eval_008",
-    "query": "performance review evaluation",
-    "relevantDocIds": ["11"],
+    "query": "first week checklist new job",
+    "relevantDocIds": ["15"],
     "difficulty": "medium",
-    "personaHint": "team lead"
+    "personaHint": "new hire"
   },
   {
     "id": "wp_eval_009",
-    "query": "engineering career growth levels",
-    "relevantDocIds": ["6"],
+    "query": "how does the company decide my pay raise",
+    "relevantDocIds": ["13", "11"],
+    "difficulty": "hard",
+    "personaHint": "engineering manager"
+  },
+  {
+    "id": "wp_eval_010",
+    "query": "tips for working with sales as an engineer",
+    "relevantDocIds": ["7"],
     "difficulty": "medium",
     "personaHint": "software engineer"
   },
   {
-    "id": "wp_eval_010",
-    "query": "office pet rules bring dog",
-    "relevantDocIds": ["10"],
-    "difficulty": "easy",
-    "personaHint": "office worker"
-  },
-  {
     "id": "wp_eval_011",
-    "query": "code of conduct ethics",
-    "relevantDocIds": ["9"],
-    "difficulty": "easy",
-    "personaHint": "compliance officer"
+    "query": "update my W4 tax withholding",
+    "relevantDocIds": ["14"],
+    "difficulty": "medium",
+    "personaHint": "HR assistant"
   },
   {
     "id": "wp_eval_012",
-    "query": "tax election W4 forms",
-    "relevantDocIds": ["14"],
+    "query": "mandatory return to office schedule",
+    "relevantDocIds": ["2", "3"],
     "difficulty": "hard",
-    "personaHint": "HR assistant"
+    "personaHint": "remote employee"
+  },
+  {
+    "id": "wp_eval_013",
+    "query": "side project intellectual property rules",
+    "relevantDocIds": ["8"],
+    "difficulty": "hard",
+    "personaHint": "software engineer"
+  },
+  {
+    "id": "wp_eval_014",
+    "query": "customer retention goals FY24",
+    "relevantDocIds": ["4"],
+    "difficulty": "hard",
+    "personaHint": "account executive"
+  },
+  {
+    "id": "wp_eval_015",
+    "query": "ergonomic home office setup requirements",
+    "relevantDocIds": ["1"],
+    "difficulty": "hard",
+    "personaHint": "remote employee"
+  },
+  {
+    "id": "wp_eval_016",
+    "query": "what is the company policy on data security and passwords",
+    "relevantDocIds": ["9", "1"],
+    "difficulty": "hard",
+    "personaHint": "IT admin"
   }
 ]

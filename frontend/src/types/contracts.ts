@@ -27,6 +27,11 @@ export interface LlmConfig {
   apiKey?: string;
 }
 
+export interface LexicalFieldEntry {
+  field: string;
+  boost: number;
+}
+
 export interface ConnectRequest {
   mode: RunMode;
   esUrl?: string;
@@ -78,7 +83,7 @@ export interface EvalCase {
 }
 
 export interface SearchProfile {
-  lexicalFields: Array<{ field: string; boost: number }>;
+  lexicalFields: LexicalFieldEntry[];
   multiMatchType: 'best_fields' | 'most_fields' | 'cross_fields' | 'phrase';
   minimumShouldMatch: string;
   tieBreaker: number;
@@ -106,7 +111,8 @@ export interface ExperimentRecord {
   timestamp: string;
   hypothesis: string;
   change: SearchProfileChange;
-  baselineScore: number;
+  beforeScore: number;
+  baselineScore?: number;
   candidateScore: number;
   deltaAbsolute: number;
   deltaPercent: number;
@@ -160,7 +166,6 @@ export interface RunLaunchConfig {
   maxExperiments: number;
   personaCount: number;
   autoStopOnPlateau: boolean;
-  personaPrompt: string;
 }
 
 export interface CompressionMethodResult {
@@ -194,6 +199,10 @@ export interface HeroMetrics {
   elapsedSeconds: number;
   projectedMonthlySavingsUsd?: number | null;
   scoreTimeline: Array<{ t: number; score: number }>;
+  // Continuation tracking — cumulative progress across run chain
+  originalBaselineScore?: number | null;
+  priorExperimentsRun?: number;
+  priorImprovementsKept?: number;
 }
 
 export interface RunConfig {
@@ -268,12 +277,18 @@ export interface ReportPayload {
     improvementsKept: number;
     durationSeconds: number;
     projectedMonthlySavingsUsd?: number | null;
+    // Continuation tracking
+    isContinuation?: boolean;
+    originalBaselineScore?: number | null;
+    totalExperimentsRun?: number | null;
+    totalImprovementsKept?: number | null;
   };
   connection: ConnectionSummary;
   connectionConfig?: {
     mode: RunMode;
     esUrl?: string | null;
     apiKey?: string | null;
+    hasApiKey?: boolean;
     indexName?: string | null;
     evalSet: EvalCase[];
     llm?: LlmConfig | null;

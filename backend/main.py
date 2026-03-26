@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from .config import settings
 from .services.persistence_service import PersistenceService
 from .services.run_manager import RunManager
 from .api import routes_health, routes_connect, routes_runs, routes_committee, ws_runs
@@ -31,6 +31,7 @@ async def lifespan(app: FastAPI):
         ctx.cancel_flag.set()
         for task in ctx.tasks:
             task.cancel()
+    await persistence.close()
 
 
 app = FastAPI(
@@ -46,7 +47,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -66,7 +67,7 @@ app.include_router(ws_runs.router)  # WebSocket — no /api prefix
 # Static files (production frontend)
 # ---------------------------------------------------------------------------
 
-frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
+frontend_dist = (Path(__file__).parent.parent / "frontend" / "dist").resolve()
 if frontend_dist.exists():
     assets_dir = frontend_dist / "assets"
     if assets_dir.exists():
@@ -78,7 +79,11 @@ if frontend_dist.exists():
 
     @app.get("/{full_path:path}", include_in_schema=False)
     async def spa_fallback(full_path: str):
-        candidate = frontend_dist / full_path
+        candidate = (frontend_dist / full_path).resolve()
+        try:
+            candidate.relative_to(frontend_dist)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail="Not found") from exc
         if candidate.exists() and candidate.is_file():
             return FileResponse(candidate)
         return FileResponse(frontend_dist / "index.html")
@@ -92,7 +97,7 @@ if __name__ == "__main__":
 
     uvicorn.run(
         "backend.main:app",
-        host=os.getenv("HOST", "0.0.0.0"),
-        port=int(os.getenv("PORT", "8000")),
+        host=settings.host,
+        port=settings.port,
         reload=True,
     )

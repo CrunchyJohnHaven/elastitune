@@ -48,19 +48,19 @@ export const PREVIEW_EXPERIMENTS: Partial<ExperimentRecord>[] = [
   {
     experimentId: 1, hypothesis: 'Stronger title weighting improves exact lookups',
     change: { path: 'lexicalFields[0].boost', before: 3.0, after: 4.0, label: 'title boost 3.0 \u2192 4.0' },
-    baselineScore: 0.412, candidateScore: 0.428, deltaAbsolute: 0.016, deltaPercent: 3.88,
+    beforeScore: 0.412, candidateScore: 0.428, deltaAbsolute: 0.016, deltaPercent: 3.88,
     decision: 'kept', durationMs: 2341,
   },
   {
     experimentId: 2, hypothesis: 'Cross-fields matching improves multi-field recall',
     change: { path: 'multiMatchType', before: 'best_fields', after: 'cross_fields', label: 'multiMatchType best_fields \u2192 cross_fields' },
-    baselineScore: 0.428, candidateScore: 0.421, deltaAbsolute: -0.007, deltaPercent: -1.63,
+    beforeScore: 0.428, candidateScore: 0.421, deltaAbsolute: -0.007, deltaPercent: -1.63,
     decision: 'reverted', durationMs: 1987,
   },
   {
     experimentId: 3, hypothesis: 'Phrase boost rewards exact term sequences',
     change: { path: 'phraseBoost', before: 0.0, after: 1.0, label: 'phraseBoost 0.0 \u2192 1.0' },
-    baselineScore: 0.428, candidateScore: 0.441, deltaAbsolute: 0.013, deltaPercent: 3.04,
+    beforeScore: 0.428, candidateScore: 0.441, deltaAbsolute: 0.013, deltaPercent: 3.04,
     decision: 'kept', durationMs: 2104,
   },
 ];

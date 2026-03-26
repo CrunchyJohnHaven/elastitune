@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from backend.main import app
+from backend.main import app  # noqa: E402
 
 
 def main() -> int:
@@ -20,7 +20,9 @@ def main() -> int:
         print("ok health")
 
         search_connect = client.post("/api/connect", json={"mode": "demo"})
-        assert search_connect.status_code == 200, f"search connect failed: {search_connect.text}"
+        assert search_connect.status_code == 200, (
+            f"search connect failed: {search_connect.text}"
+        )
         search_connection_id = search_connect.json()["connectionId"]
         print("ok search connect")
 
@@ -37,7 +39,9 @@ def main() -> int:
         assert search_run.status_code == 200, f"search run failed: {search_run.text}"
         search_run_id = search_run.json()["runId"]
         search_snapshot = client.get(f"/api/runs/{search_run_id}")
-        assert search_snapshot.status_code == 200, f"search snapshot failed: {search_snapshot.text}"
+        assert search_snapshot.status_code == 200, (
+            f"search snapshot failed: {search_snapshot.text}"
+        )
         print("ok search run")
 
         committee_connect = client.post(
@@ -60,7 +64,9 @@ def main() -> int:
                 "committeeDescription": "CIO\nGeneral Counsel\nBudget Director\nDistrict Attorney\nOIG Auditor",
             },
         )
-        assert committee_connect.status_code == 200, f"committee connect failed: {committee_connect.text}"
+        assert committee_connect.status_code == 200, (
+            f"committee connect failed: {committee_connect.text}"
+        )
         committee_connection_id = committee_connect.json()["connectionId"]
         print("ok committee connect")
 
@@ -73,31 +79,43 @@ def main() -> int:
                 "autoStopOnPlateau": True,
             },
         )
-        assert committee_run.status_code == 200, f"committee run failed: {committee_run.text}"
+        assert committee_run.status_code == 200, (
+            f"committee run failed: {committee_run.text}"
+        )
         committee_run_id = committee_run.json()["runId"]
 
         snapshot_payload = None
         deadline = time.time() + 12.0
         while time.time() < deadline:
             committee_snapshot = client.get(f"/api/committee/runs/{committee_run_id}")
-            assert committee_snapshot.status_code == 200, f"committee snapshot failed: {committee_snapshot.text}"
+            assert committee_snapshot.status_code == 200, (
+                f"committee snapshot failed: {committee_snapshot.text}"
+            )
             snapshot_payload = committee_snapshot.json()
             if snapshot_payload.get("stage") == "completed":
                 break
             time.sleep(0.5)
 
         assert snapshot_payload is not None, "committee snapshot never returned"
-        assert snapshot_payload.get("stage") == "completed", "committee run did not complete within smoke timeout"
+        assert snapshot_payload.get("stage") == "completed", (
+            "committee run did not complete within smoke timeout"
+        )
         assert "metrics" in snapshot_payload, "committee snapshot missing metrics"
-        assert snapshot_payload["metrics"]["elapsedSeconds"] >= 1, "committee elapsed time never advanced"
+        assert snapshot_payload["metrics"]["elapsedSeconds"] >= 1, (
+            "committee elapsed time never advanced"
+        )
         print("ok committee run")
 
         committee_report = client.get(f"/api/committee/runs/{committee_run_id}/report")
-        assert committee_report.status_code == 200, f"committee report failed: {committee_report.text}"
+        assert committee_report.status_code == 200, (
+            f"committee report failed: {committee_report.text}"
+        )
         print("ok committee report")
 
         committee_export = client.get(f"/api/committee/runs/{committee_run_id}/export")
-        assert committee_export.status_code == 200, f"committee export failed: {committee_export.text}"
+        assert committee_export.status_code == 200, (
+            f"committee export failed: {committee_export.text}"
+        )
         print("ok committee export")
 
     print("all smoke checks passed")

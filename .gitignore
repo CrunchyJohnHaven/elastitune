@@ -9,10 +9,12 @@ build/
 .venv/
 venv/
 env/
+.pytest_cache/
 
 # Node
 node_modules/
 frontend/dist/
+.vite/
 
 # Environment
 .env
@@ -25,9 +27,12 @@ frontend/dist/
 *.swp
 *.swo
 *~
-.DS_Store
 
-# Benchmarks (cloned repos)
+# OS
+.DS_Store
+Thumbs.db
+
+# Benchmarks (cloned repos + generated bulk data)
 .benchmarks/
 benchmarks/tmdb-movies/chunk_*
 benchmarks/tmdb-movies/tmdb_es.json
@@ -35,22 +40,33 @@ benchmarks/tmdb-movies/tmdb_es.json.zip
 benchmarks/tmdb-movies/tmdb_dump_2020-12-29.json
 benchmarks/tmdb-movies/tmdb_movies_bulk.json
 
+# One-off scripts
+overnight_run.py
+executive_memo.js
+
+# Generated documents
+ElastiTune_Executive_*.docx
+EXECUTIVE_SUMMARY.md
+
+# Doc/asset scratch area
+doc-assets/
+
+# Benchmark result artifacts
+benchmark_results.json
+overnight_*.json
+
+# Runtime data (not source)
+backend/data/runs/
+
 # Temp files
 tmp/
 *.tmp
-overnight_scores.json
-overnight_scores_v1.json
-overnight_best_profiles.json
-overnight_timeline.json
 overnight_run.log
 
 # SQLite databases
 *.db
 *.db-journal
 *.db-wal
-
-# App outputs
-dist/
 
 # Claude Code
 .claude/

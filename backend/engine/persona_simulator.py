@@ -1,8 +1,6 @@
 import asyncio
 import random
 import time
-from typing import List
-from ..models.contracts import PersonaViewModel, PersonaRuntime
 from ..models.runtime import RunContext
 
 
@@ -26,7 +24,7 @@ async def run_persona_simulator(ctx: RunContext, run_manager):
 
             for p in active_personas:
                 # Set to searching
-                p.state = 'searching'
+                p.state = "searching"
                 p.pulseUntil = now + 1.5
 
                 # Pick a query
@@ -39,15 +37,15 @@ async def run_persona_simulator(ctx: RunContext, run_manager):
 
                 roll = rng.random()
                 if roll < success_prob:
-                    p.state = 'success'
+                    p.state = "success"
                     p.successes += 1
                     p.lastResultRank = rng.randint(1, 3)
                 elif roll < success_prob + 0.25:
-                    p.state = 'partial'
+                    p.state = "partial"
                     p.partials += 1
                     p.lastResultRank = rng.randint(4, 10)
                 else:
-                    p.state = 'failure'
+                    p.state = "failure"
                     p.failures += 1
                     p.lastResultRank = None
 
@@ -61,23 +59,28 @@ async def run_persona_simulator(ctx: RunContext, run_manager):
             total_searches = sum(p.totalSearches for p in ctx.personas)
             total_successes = sum(p.successes for p in ctx.personas)
             if total_searches > 0:
-                ctx.metrics.personaSuccessRate = round(total_successes / total_searches, 3)
+                ctx.metrics.personaSuccessRate = round(
+                    total_successes / total_searches, 3
+                )
 
             # Send persona batch update
-            await run_manager.publish(ctx.run_id, {
-                "type": "persona.batch",
-                "payload": {
-                    "runId": ctx.run_id,
-                    "personas": [p.model_dump() for p in updated]
-                }
-            })
+            await run_manager.publish(
+                ctx.run_id,
+                {
+                    "type": "persona.batch",
+                    "payload": {
+                        "runId": ctx.run_id,
+                        "personas": [p.model_dump() for p in updated],
+                    },
+                },
+            )
 
             # After a short time, reset searching personas to idle/state
             await asyncio.sleep(rng.uniform(0.8, 1.5))
 
             for p in updated:
-                if p.state == 'searching':
-                    p.state = 'idle'
+                if p.state == "searching":
+                    p.state = "idle"
 
             # Handle "reacting" when experiment is accepted
             # (This is triggered by the optimizer loop)

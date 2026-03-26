@@ -74,7 +74,11 @@ class CommitteeRunContext:
         self.personas = persona_views
         self.metrics = CommitteeMetrics()
         self.rewrites: list[RewriteAttempt] = []
-        self.warnings: list[str] = list(dict.fromkeys(list(connection.warnings) + list(connection.document.parseWarnings)))
+        self.warnings: list[str] = list(
+            dict.fromkeys(
+                list(connection.warnings) + list(connection.document.parseWarnings)
+            )
+        )
         self.max_rewrites = max_rewrites
         self.duration_minutes = duration_minutes
         self.auto_stop_on_plateau = auto_stop_on_plateau
@@ -87,7 +91,7 @@ class CommitteeRunContext:
         self.started_at: Optional[str] = None
         self.started_monotonic: Optional[float] = None
         self.completed_at: Optional[str] = None
-        self._best_score: float = 0.0
+        self.best_score: float = 0.0
         self.section_evaluations: Dict[Tuple[int, str], SectionEvaluation] = {}
         self.baseline_section_text: Dict[int, str] = {
             section.id: section.content for section in connection.document.sections

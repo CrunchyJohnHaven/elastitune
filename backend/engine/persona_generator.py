@@ -1,170 +1,553 @@
-import json
-import random
-from pathlib import Path
-from typing import List, Optional, Dict, Any
-from ..models.contracts import PersonaDefinition, PersonaViewModel, ConnectionSummary
+from __future__ import annotations
 
-# Archetype libraries by domain
-ARCHETYPES = {
-    "security": [
-        ("Maya Chen", "Senior SOC Analyst", "Security Operations", "SOC Analyst",
-         "Investigate alerts and identify true positives quickly",
-         ["lateral movement smb east west", "failed auth admin account", "powershell execution suspicious", "alert rule triggered last hour"]),
-        ("Jordan Price", "Threat Hunter", "Threat Intelligence", "Threat Hunter",
-         "Proactively search for advanced persistent threats",
-         ["c2 beacon dns exfil", "credential access lsass", "persistence registry run keys", "unusual outbound port 443 traffic"]),
-        ("Priya Raman", "IAM Administrator", "Identity & Access", "IAM Administrator",
-         "Manage identity policies and investigate access anomalies",
-         ["privileged account creation", "service account lateral", "mfa bypass attempt", "stale admin credentials"]),
-        ("Elena Ortiz", "Detection Engineer", "Security Engineering", "Detection Engineer",
-         "Build and tune detection rules for maximum fidelity",
-         ["rule false positive ratio", "detection coverage mitre t1059", "sigma rule edr deployment", "low signal high noise alerts"]),
-        ("Marcus Lee", "Compliance Auditor", "Compliance", "Compliance Auditor",
-         "Audit security controls and generate evidence for audits",
-         ["access log evidence soc2", "policy exception approval workflow", "encryption at rest compliance", "data retention violation"]),
-        ("Samir Patel", "Incident Commander", "CISO Office", "Incident Commander",
-         "Coordinate and manage active security incidents end to end",
-         ["incident timeline reconstruction", "blast radius assessment", "stakeholder update template", "containment action log"]),
-        ("Hannah Brooks", "AppSec Engineer", "Application Security", "AppSec Engineer",
-         "Identify and remediate application vulnerabilities",
-         ["sql injection application layer", "xss vulnerability web app", "insecure deserialization java", "api authentication bypass"]),
-        ("Diego Silva", "SRE", "Infrastructure", "SRE",
-         "Maintain reliability and investigate infrastructure-level alerts",
-         ["cpu spike k8s node", "memory leak container crash", "disk io high latency", "network timeout pod restart"]),
-        ("Nora Kim", "Vulnerability Analyst", "Vulnerability Management", "Vulnerability Analyst",
-         "Track and prioritize vulnerability remediation",
-         ["critical cve unpatched servers", "cvss 9 exploitable remote", "patch tuesday windows server", "vulnerability scanner coverage gap"]),
-        ("Tessa Moore", "Helpdesk Lead", "IT Support", "Helpdesk Lead",
-         "Triage user-reported security issues and escalate appropriately",
-         ["user account locked out", "phishing email report employee", "vpn connection failure", "device compliance failure"]),
-        ("Alex Rivers", "Red Team Lead", "Offensive Security", "Threat Hunter",
-         "Simulate adversary techniques and validate defenses",
-         ["kerberoasting golden ticket", "dcsync active directory", "living off land binaries", "pass the hash ntlm"]),
-        ("Sam Torres", "Cloud Security Engineer", "Cloud Security", "SOC Analyst",
-         "Monitor and secure cloud infrastructure environments",
-         ["s3 bucket public exposure", "iam role overpermission", "cloudtrail log gaps", "ec2 security group wide open"]),
-    ],
-    "developer_docs": [
-        ("Alex Kim", "Backend Engineer", "Engineering", "Backend Engineer",
-         "Find API documentation and implementation patterns",
-         ["rest api authentication oauth2", "database connection pool config", "async handler error retry", "pagination cursor based"]),
-        ("Sam Rivera", "Frontend Engineer", "Engineering", "Frontend Engineer",
-         "Look up component docs and UI framework patterns",
-         ["react hook useState example", "css grid responsive layout", "form validation library", "bundle size optimization"]),
-        ("Jordan Lee", "SRE", "Platform", "SRE",
-         "Find runbooks and infrastructure documentation",
-         ["kubernetes deployment rollback", "prometheus alert rule", "log aggregation fluentd", "circuit breaker pattern"]),
-        ("Casey Nguyen", "Developer Advocate", "Developer Relations", "Developer Advocate",
-         "Research developer experience improvements",
-         ["getting started quickstart guide", "sdk installation npm", "example project tutorial", "common error troubleshooting"]),
-        ("Morgan Davis", "Product Manager", "Product", "Product Manager",
-         "Understand feature capabilities and roadmap context",
-         ["feature flag rollout strategy", "api versioning deprecation", "user analytics instrumentation", "a/b test implementation"]),
-        ("Riley Chen", "Support Engineer", "Customer Support", "Support Engineer",
-         "Answer customer technical questions accurately",
-         ["rate limit exceeded 429 error", "webhook signature validation", "idempotency key implementation", "data export csv endpoint"]),
-        ("Quinn Williams", "QA Lead", "Quality Assurance", "QA Lead",
-         "Find test patterns and quality documentation",
-         ["integration test setup teardown", "mock external dependency", "load test k6 script", "regression test coverage"]),
-        ("Blake Thompson", "Platform Engineer", "Infrastructure", "Platform Engineer",
-         "Build internal tooling on top of platform APIs",
-         ["service mesh configuration", "ci cd pipeline template", "secret management vault", "observability tracing opentelemetry"]),
-    ],
-    "compliance": [
-        ("Morgan Chen", "Compliance Manager", "Legal & Compliance", "Compliance Manager",
-         "Manage compliance programs and regulatory requirements",
-         ["gdpr data subject request", "soc2 control evidence collection", "policy update review cycle", "vendor risk assessment template"]),
-        ("Taylor Brown", "Privacy Counsel", "Legal", "Privacy Counsel",
-         "Advise on data privacy and regulatory obligations",
-         ["data retention schedule policy", "consent management platform", "privacy impact assessment template", "cross border transfer mechanism"]),
-        ("Jamie Wilson", "Internal Auditor", "Audit", "Internal Auditor",
-         "Conduct internal audits and assess control effectiveness",
-         ["control testing evidence", "audit finding remediation plan", "risk rating methodology", "audit trail completeness check"]),
-        ("Drew Martinez", "Risk Analyst", "Risk Management", "Risk Analyst",
-         "Identify and quantify operational and compliance risks",
-         ["risk register update q4", "inherent residual risk rating", "control gap analysis", "risk appetite threshold breach"]),
-        ("Chris Rodriguez", "Policy Manager", "Governance", "Policy Manager",
-         "Maintain and distribute organizational policies",
-         ["acceptable use policy update", "policy exception request process", "policy acknowledgment tracking", "version control policy document"]),
-        ("Pat Anderson", "Security Compliance Lead", "Security", "Security Compliance Lead",
-         "Bridge security operations and compliance requirements",
-         ["nist csf control mapping", "pentest finding compliance", "security awareness training completion", "vulnerability scan compliance report"]),
-    ],
-    "general": [
-        ("Alex Chen", "Analyst", "Operations", "Analyst",
-         "Research and analyze data to support decisions",
-         ["monthly report summary", "trend analysis Q3", "data quality issue", "KPI dashboard update"]),
-        ("Sam Williams", "Researcher", "Research", "Researcher",
-         "Deep-dive into topics and synthesize information",
-         ["background research topic overview", "literature review methodology", "data source comparison", "research gap analysis"]),
-        ("Jordan Smith", "Team Lead", "Management", "Team Lead",
-         "Coordinate team work and escalate blockers",
-         ["team standup notes", "project status update", "blocker escalation process", "sprint retrospective actions"]),
-        ("Casey Jones", "Support Specialist", "Customer Success", "Support Specialist",
-         "Help customers find answers quickly",
-         ["customer error message fix", "how to configure integration", "billing question FAQ", "account settings help"]),
-        ("Morgan Brown", "Operations Manager", "Operations", "Operations Manager",
-         "Oversee operations and drive efficiency",
-         ["process improvement checklist", "vendor contract renewal", "operational metric review", "SLA compliance report"]),
-        ("Riley Davis", "New Hire", "General", "New Hire",
-         "Onboard quickly and find orientation resources",
-         ["getting started onboarding", "company policy handbook", "tool access request", "first day checklist"]),
-        ("Quinn Miller", "Power User", "Advanced Users", "Power User",
-         "Push the boundaries of what the system can do",
-         ["advanced filter complex query", "bulk export all records", "api integration setup", "custom report template"]),
-        ("Drew Wilson", "Auditor", "Compliance", "Auditor",
-         "Review records and verify process compliance",
-         ["audit log complete records", "change history review", "access log compliance", "evidence export for review"]),
-    ],
+import math
+import random
+import re
+from typing import Any, Dict, List, Optional
+
+from ..models.contracts import ConnectionSummary, PersonaViewModel
+from ..services.llm_service import LLMService
+
+PERSONA_TEMPLATES: List[tuple[str, str, str, str, str, List[str]]] = [
+    (
+        "Alex",
+        "SOC Analyst",
+        "Security",
+        "Power User",
+        "Detect active threats",
+        ["critical cve", "active exploitation", "threat intel"],
+    ),
+    (
+        "Sam",
+        "Threat Hunter",
+        "Security",
+        "Expert",
+        "Hunt advanced threats",
+        ["lateral movement", "persistence mechanism", "c2 beacon"],
+    ),
+    (
+        "Jordan",
+        "CISO",
+        "Executive",
+        "Casual",
+        "Understand risk posture",
+        ["top risks", "compliance gap", "board report"],
+    ),
+    (
+        "Taylor",
+        "DevSecOps Engineer",
+        "Engineering",
+        "Power User",
+        "Secure CI/CD pipeline",
+        ["supply chain vulnerability", "container cve", "sast findings"],
+    ),
+    (
+        "Morgan",
+        "Incident Responder",
+        "Security",
+        "Expert",
+        "Triage active incidents",
+        ["ioc hash", "ransomware playbook", "evidence collection"],
+    ),
+    (
+        "Casey",
+        "Vulnerability Manager",
+        "IT",
+        "Expert",
+        "Prioritise patching",
+        ["cvss 9", "patch priority", "asset exposure"],
+    ),
+    (
+        "Riley",
+        "Compliance Officer",
+        "Legal",
+        "Casual",
+        "Map controls to regulations",
+        ["gdpr control", "hipaa requirement", "audit evidence"],
+    ),
+    (
+        "Drew",
+        "Penetration Tester",
+        "Security",
+        "Expert",
+        "Research exploitation paths",
+        ["exploit poc", "privilege escalation", "bypass technique"],
+    ),
+    (
+        "Avery",
+        "Security Architect",
+        "Engineering",
+        "Power User",
+        "Design secure systems",
+        ["zero trust pattern", "cloud misconfiguration", "network segmentation"],
+    ),
+    (
+        "Blake",
+        "Cloud Engineer",
+        "DevOps",
+        "Casual",
+        "Harden cloud infrastructure",
+        ["aws advisory", "azure cve", "kubernetes security"],
+    ),
+    (
+        "Charlie",
+        "Privacy Analyst",
+        "Legal",
+        "Casual",
+        "Assess data exposure risks",
+        ["pii leak", "data breach notification", "dpo guidance"],
+    ),
+    (
+        "Dana",
+        "Red Team Lead",
+        "Security",
+        "Expert",
+        "Simulate adversary TTPs",
+        ["credential dumping", "kerberoasting", "living off the land"],
+    ),
+    (
+        "Evan",
+        "Blue Team Analyst",
+        "Security",
+        "Power User",
+        "Detect and respond",
+        ["detection rule", "sigma rule", "yara signature"],
+    ),
+    (
+        "Fran",
+        "IT Operations Manager",
+        "IT",
+        "Casual",
+        "Minimize service disruption",
+        ["availability impact", "service outage cve", "emergency patch"],
+    ),
+    (
+        "Glen",
+        "Application Developer",
+        "Engineering",
+        "Casual",
+        "Audit open source dependencies",
+        ["npm vulnerability", "log4j", "dependency confusion"],
+    ),
+    (
+        "Hana",
+        "Internal Auditor",
+        "Compliance",
+        "Power User",
+        "Gather audit evidence",
+        ["control failure", "remediation status", "risk acceptance"],
+    ),
+    (
+        "Ivan",
+        "Network Engineer",
+        "IT",
+        "Expert",
+        "Secure network infrastructure",
+        ["cisco advisory", "fortinet vulnerability", "bgp hijack"],
+    ),
+    (
+        "Jess",
+        "Malware Analyst",
+        "Security",
+        "Expert",
+        "Reverse engineer threats",
+        ["dropper behaviour", "c2 protocol", "sandbox evasion"],
+    ),
+    (
+        "Kim",
+        "Product Security Manager",
+        "Engineering",
+        "Power User",
+        "Manage product risk",
+        ["third party risk", "sbom vulnerability", "responsible disclosure"],
+    ),
+    (
+        "Lee",
+        "Security Awareness Trainer",
+        "HR",
+        "Casual",
+        "Create training content",
+        ["phishing simulation", "social engineering cve", "security culture"],
+    ),
+    (
+        "Mel",
+        "CTO",
+        "Executive",
+        "Casual",
+        "Strategic technology risk",
+        ["critical infrastructure", "nation state threat", "technology dependency"],
+    ),
+    (
+        "Nora",
+        "Digital Forensics Analyst",
+        "Security",
+        "Expert",
+        "Investigate breaches",
+        ["forensic artifact", "timeline analysis", "disk image"],
+    ),
+    (
+        "Omar",
+        "Bug Bounty Researcher",
+        "External",
+        "Expert",
+        "Find and report vulnerabilities",
+        ["memory corruption", "use after free", "heap overflow"],
+    ),
+    (
+        "Pat",
+        "Security Product Manager",
+        "Product",
+        "Casual",
+        "Plan security roadmap",
+        ["security debt", "feature request", "risk register"],
+    ),
+]
+
+GENERAL_PERSONA_SEEDS: List[Dict[str, Any]] = [
+    {
+        "name": "Jamie",
+        "role": "Researcher",
+        "department": "Knowledge",
+        "archetype": "Power User",
+        "goal": "Find the most relevant source fast",
+        "queries": [
+            "getting started guide",
+            "best practice",
+            "troubleshooting workflow",
+        ],
+    },
+    {
+        "name": "Taylor",
+        "role": "Program Manager",
+        "department": "Operations",
+        "archetype": "Casual",
+        "goal": "Answer stakeholder questions with confidence",
+        "queries": ["policy summary", "latest update", "process overview"],
+    },
+    {
+        "name": "Morgan",
+        "role": "Analyst",
+        "department": "Strategy",
+        "archetype": "Expert",
+        "goal": "Compare detailed records across the corpus",
+        "queries": ["deep dive analysis", "root cause", "detailed reference"],
+    },
+]
+
+ECOMMERCE_PERSONA_SEEDS: List[Dict[str, Any]] = [
+    {
+        "name": "Ava",
+        "role": "Online Shopper",
+        "department": "Customer",
+        "archetype": "Casual",
+        "goal": "Find the exact product quickly",
+        "queries": ["lip pencil", "serum foundation", "waterproof mascara"],
+    },
+    {
+        "name": "Noah",
+        "role": "Category Merchandiser",
+        "department": "E-commerce",
+        "archetype": "Power User",
+        "goal": "Check whether high-intent products surface correctly",
+        "queries": ["best selling foundation", "long wear concealer", "gift set"],
+    },
+    {
+        "name": "Mia",
+        "role": "Customer Support Lead",
+        "department": "Support",
+        "archetype": "Power User",
+        "goal": "Resolve product questions from customer language",
+        "queries": [
+            "sensitive skin foundation",
+            "matte lip color",
+            "shade matching help",
+        ],
+    },
+]
+
+STOPWORDS = {
+    "a",
+    "an",
+    "and",
+    "for",
+    "from",
+    "how",
+    "in",
+    "into",
+    "of",
+    "on",
+    "the",
+    "to",
+    "with",
 }
 
 
-class PersonaGenerator:
-    def __init__(self, llm_service=None):
-        self.llm = llm_service
+async def build_personas(
+    persona_count: int = 36,
+    mode: str = "demo",
+    domain: str = "general",
+    sample_docs: Optional[List[Dict[str, Any]]] = None,
+    text_fields: Optional[List[str]] = None,
+    llm_config: Optional[Any] = None,
+) -> List[PersonaViewModel]:
+    sample_docs = sample_docs or []
+    text_fields = text_fields or []
+    templates = await resolve_persona_templates(
+        persona_count=persona_count,
+        mode=mode,
+        domain=domain,
+        sample_docs=sample_docs,
+        text_fields=text_fields,
+        llm_config=llm_config,
+    )
 
-    async def generate(self, summary: ConnectionSummary, count: int = 24) -> List[PersonaViewModel]:
-        domain = summary.detectedDomain
-        archetypes = ARCHETYPES.get(domain, ARCHETYPES["general"])
+    personas: List[PersonaViewModel] = []
+    rng = random.Random(2024)
+    template_count = max(1, len(templates))
 
-        # If LLM available and we want more variety, could use LLM
-        # For now, use archetype library with cycling
-        personas = []
-        rng = random.Random(42)  # Deterministic for consistency
-
-        for i in range(count):
-            template = archetypes[i % len(archetypes)]
-            name, role, dept, archetype, goal, queries = template
-
-            # Add some variety in names for duplicates
-            if i >= len(archetypes):
-                suffix = rng.choice(["Jr.", "II", "Sr.", ""])
-                name_parts = name.split()
-                name = f"{name_parts[0]} {rng.choice(['M.', 'J.', 'A.', 'R.', 'K.'])} {name_parts[-1]} {suffix}".strip()
-
-            orbit = i % 6  # 6 orbit lanes
-
-            p = PersonaViewModel(
+    for i, template in enumerate(templates[:persona_count]):
+        name, role, department, archetype, goal, queries = template
+        cycle = i // template_count
+        display_name = name if cycle == 0 else f"{name} {cycle + 1}"
+        orbit = (i % 5) + 1
+        personas.append(
+            PersonaViewModel(
                 id=f"persona_{i:03d}",
-                name=name,
+                name=display_name,
                 role=role,
-                department=dept,
+                department=department,
                 archetype=archetype,
                 goal=goal,
                 orbit=orbit,
-                colorSeed=i * 37 + 13,
+                colorSeed=rng.randint(0, 255),
                 queries=queries,
-                # Runtime defaults
-                state='idle',
+                state="idle",
+                lastQuery=None,
+                lastResultRank=None,
                 successRate=0.0,
                 totalSearches=0,
                 successes=0,
                 partials=0,
                 failures=0,
-                angle=rng.uniform(0, 6.283),
-                speed=rng.uniform(0.06, 0.14),
-                radius=120.0 + orbit * 52.0,
+                angle=(i * 2 * math.pi) / max(persona_count, 1),
+                speed=0.05 + rng.random() * 0.05,
+                radius=72.0 + orbit * 38.0,
+                pulseUntil=None,
+                reactUntil=None,
             )
-            personas.append(p)
+        )
+    return personas
 
-        return personas
+
+async def resolve_persona_templates(
+    persona_count: int,
+    mode: str,
+    domain: str,
+    sample_docs: List[Dict[str, Any]],
+    text_fields: List[str],
+    llm_config: Optional[Any],
+) -> List[tuple[str, str, str, str, str, List[str]]]:
+    if mode == "demo":
+        return cycle_templates(PERSONA_TEMPLATES, persona_count)
+
+    llm_templates = await generate_personas_with_llm(
+        persona_count=persona_count,
+        domain=domain,
+        sample_docs=sample_docs,
+        text_fields=text_fields,
+        llm_config=llm_config,
+    )
+    if llm_templates:
+        return llm_templates
+
+    if looks_like_product_catalog(sample_docs, text_fields):
+        return cycle_templates(
+            seed_dicts_to_templates(ECOMMERCE_PERSONA_SEEDS), persona_count
+        )
+
+    if domain == "general":
+        generated = generate_general_persona_templates(
+            sample_docs, text_fields, persona_count
+        )
+        if generated:
+            return generated
+
+    return cycle_templates(PERSONA_TEMPLATES, persona_count)
+
+
+async def generate_personas_with_llm(
+    persona_count: int,
+    domain: str,
+    sample_docs: List[Dict[str, Any]],
+    text_fields: List[str],
+    llm_config: Optional[Any],
+) -> List[tuple[str, str, str, str, str, List[str]]]:
+    if not llm_config or llm_config.provider == "disabled":
+        return []
+
+    generated = await LLMService(llm_config).generate_personas(
+        domain=domain,
+        sample_docs=sample_docs,
+        text_fields=text_fields,
+        count=min(persona_count, 12),
+    )
+    templates: List[tuple[str, str, str, str, str, List[str]]] = []
+    for item in generated:
+        if not isinstance(item, dict):
+            continue
+        queries = item.get("queries") or []
+        if not isinstance(queries, list) or not queries:
+            continue
+        templates.append(
+            (
+                str(item.get("name", "Search User")),
+                str(item.get("role", "User")),
+                str(item.get("department", "Search")),
+                str(item.get("archetype", "Casual")),
+                str(item.get("goal", "Find relevant results")),
+                [str(query) for query in queries[:4]],
+            )
+        )
+
+    return cycle_templates(templates, persona_count) if templates else []
+
+
+def generate_general_persona_templates(
+    sample_docs: List[Dict[str, Any]],
+    text_fields: List[str],
+    persona_count: int,
+) -> List[tuple[str, str, str, str, str, List[str]]]:
+    seeds = list(GENERAL_PERSONA_SEEDS)
+    query_bank: List[str] = []
+    for doc in sample_docs[:18]:
+        for field in text_fields[:3]:
+            value = doc.get(field)
+            if not isinstance(value, str):
+                continue
+            query = derive_query(value)
+            if query and query not in query_bank:
+                query_bank.append(query)
+        if len(query_bank) >= persona_count * 2:
+            break
+
+    if not query_bank:
+        return cycle_templates(seed_dicts_to_templates(seeds), persona_count)
+
+    templates: List[tuple[str, str, str, str, str, List[str]]] = []
+    for index in range(persona_count):
+        seed = seeds[index % len(seeds)]
+        start = (index * 2) % len(query_bank)
+        queries = [
+            query_bank[start],
+            query_bank[(start + 1) % len(query_bank)],
+            query_bank[(start + 2) % len(query_bank)],
+        ]
+        templates.append(
+            (
+                f"{seed['name']} {index + 1}" if index >= len(seeds) else seed["name"],
+                seed["role"],
+                seed["department"],
+                seed["archetype"],
+                seed["goal"],
+                queries,
+            )
+        )
+    return templates
+
+
+def seed_dicts_to_templates(
+    seed_dicts: List[Dict[str, Any]],
+) -> List[tuple[str, str, str, str, str, List[str]]]:
+    return [
+        (
+            str(seed["name"]),
+            str(seed["role"]),
+            str(seed["department"]),
+            str(seed["archetype"]),
+            str(seed["goal"]),
+            [str(query) for query in seed["queries"]],
+        )
+        for seed in seed_dicts
+    ]
+
+
+def cycle_templates(
+    templates: List[tuple[str, str, str, str, str, List[str]]],
+    persona_count: int,
+) -> List[tuple[str, str, str, str, str, List[str]]]:
+    if not templates:
+        templates = PERSONA_TEMPLATES
+
+    cycled = list(templates[:persona_count])
+    while len(cycled) < persona_count:
+        cycled.extend(templates[: persona_count - len(cycled)])
+    return cycled
+
+
+def looks_like_product_catalog(
+    sample_docs: List[Dict[str, Any]], text_fields: List[str]
+) -> bool:
+    keywords = {
+        "foundation",
+        "lip",
+        "mascara",
+        "concealer",
+        "price",
+        "sku",
+        "brand",
+        "product",
+        "collection",
+        "category",
+        "shade",
+        "size",
+    }
+    text_blob = " ".join(
+        str(doc.get(field, "")).lower()
+        for doc in sample_docs[:20]
+        for field in text_fields[:3]
+        if isinstance(doc.get(field), str)
+    )
+    return sum(1 for keyword in keywords if keyword in text_blob) >= 2
+
+
+def derive_query(value: str) -> str:
+    tokens = [
+        token
+        for token in re.findall(r"[a-zA-Z0-9][a-zA-Z0-9._-]*", value.lower())
+        if len(token) >= 3 and token not in STOPWORDS
+    ]
+    return " ".join(tokens[:5])
+
+
+class PersonaGenerator:
+    def __init__(self, llm_service: Optional[LLMService] = None) -> None:
+        self.llm = llm_service
+
+    async def generate(
+        self,
+        summary: ConnectionSummary,
+        count: int = 24,
+        sample_docs: Optional[List[Dict[str, Any]]] = None,
+        text_fields: Optional[List[str]] = None,
+        llm_config: Optional[Any] = None,
+        mode: str = "live",
+    ) -> List[PersonaViewModel]:
+        return await build_personas(
+            persona_count=count,
+            mode=mode,
+            domain=summary.detectedDomain,
+            sample_docs=sample_docs or [],
+            text_fields=text_fields or list(summary.primaryTextFields),
+            llm_config=llm_config,
+        )
+
+
+__all__ = [
+    "PERSONA_TEMPLATES",
+    "PersonaGenerator",
+    "build_personas",
+    "resolve_persona_templates",
+    "generate_personas_with_llm",
+    "generate_general_persona_templates",
+    "looks_like_product_catalog",
+]

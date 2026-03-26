@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
-from backend.api.routes_runs import _build_personas
+from backend.engine.persona_generator import build_personas
 from backend.models.contracts import EvalCase
 from backend.models.runtime import RunContext
 from backend.services.demo_service import DemoService
@@ -13,7 +13,9 @@ class FakeESService:
     def __init__(self, results_by_query: dict[str, list[str]]):
         self.results_by_query = results_by_query
 
-    async def execute_profile_query(self, index: str, query_text: str, profile, size: int = 10):
+    async def execute_profile_query(
+        self, index: str, query_text: str, profile, size: int = 10
+    ):
         return self.results_by_query.get(query_text, [])[:size]
 
 
@@ -24,7 +26,9 @@ def test_evaluate_profile_uses_real_rankings_for_ndcg() -> None:
         connection.es_url = "http://localhost:9200"
         connection.index_name = "products-catalog"
         connection.eval_set = [
-            EvalCase(id="eval_001", query="lip pencil", relevantDocIds=["doc_2", "doc_9"]),
+            EvalCase(
+                id="eval_001", query="lip pencil", relevantDocIds=["doc_2", "doc_9"]
+            ),
             EvalCase(id="eval_002", query="serum foundation", relevantDocIds=["doc_4"]),
         ]
 
@@ -58,7 +62,7 @@ def test_evaluate_profile_uses_real_rankings_for_ndcg() -> None:
 
 def test_live_personas_adapt_to_product_catalog_without_llm() -> None:
     async def scenario() -> None:
-        personas = await _build_personas(
+        personas = await build_personas(
             persona_count=6,
             mode="live",
             domain="general",
@@ -83,6 +87,10 @@ def test_live_personas_adapt_to_product_catalog_without_llm() -> None:
 
         roles = {persona.role for persona in personas}
         assert "SOC Analyst" not in roles
-        assert roles & {"Online Shopper", "Category Merchandiser", "Customer Support Lead"}
+        assert roles & {
+            "Online Shopper",
+            "Category Merchandiser",
+            "Customer Support Lead",
+        }
 
     asyncio.run(scenario())

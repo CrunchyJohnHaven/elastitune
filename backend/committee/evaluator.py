@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, List, Optional
 
 from ..services.llm_service import LLMService
 from .industry_profiles import IndustryProfile, IndustryRiskRule
@@ -53,10 +53,12 @@ class CommitteeEvaluator:
                             relevance=float(llm_result["relevance"]),
                             persuasiveness=float(llm_result["persuasiveness"]),
                             evidenceQuality=float(llm_result["evidence_quality"]),
-                            riskScore=1.0 - min(len(llm_result.get("risk_flags", [])) * 0.12, 0.7),
+                            riskScore=1.0
+                            - min(len(llm_result.get("risk_flags", [])) * 0.12, 0.7),
                             completeness=max(
                                 0.0,
-                                1.0 - min(len(llm_result.get("missing", [])) * 0.15, 0.75),
+                                1.0
+                                - min(len(llm_result.get("missing", [])) * 0.15, 0.75),
                             ),
                         ),
                         riskFlags=list(llm_result.get("risk_flags", [])),
@@ -76,7 +78,9 @@ class CommitteeEvaluator:
                     section.id,
                     exc,
                 )
-                self._warn_once("AI evaluation failed for one or more sections; heuristic scoring was used instead.")
+                self._warn_once(
+                    "AI evaluation failed for one or more sections; heuristic scoring was used instead."
+                )
 
         return self._heuristic_evaluation(persona, section)
 
@@ -144,7 +148,11 @@ class CommitteeEvaluator:
             )
 
         sentiment = _score_to_sentiment(average_score, self.thresholds)
-        evaluation_source = "mixed" if len(set(sources)) > 1 else (sources[0] if sources else "heuristic")
+        evaluation_source = (
+            "mixed"
+            if len(set(sources)) > 1
+            else (sources[0] if sources else "heuristic")
+        )
         evaluation_confidence = round(sum(confidences) / max(len(confidences), 1), 2)
         return CommitteePersonaView(
             id=persona.id,
@@ -155,8 +163,11 @@ class CommitteeEvaluator:
             skepticismLevel=persona.skepticismLevel,
             sentiment=sentiment,
             currentScore=round(average_score, 4),
-            supportScore=round(max(0.0, min(1.0, average_score - persona.skepticismLevel * 0.02)), 4),
-            reactionQuote=strongest_quote or "Needs stronger proof before moving forward.",
+            supportScore=round(
+                max(0.0, min(1.0, average_score - persona.skepticismLevel * 0.02)), 4
+            ),
+            reactionQuote=strongest_quote
+            or "Needs stronger proof before moving forward.",
             topObjection=top_objection,
             riskFlags=list(dict.fromkeys(all_flags))[:4],
             missing=list(dict.fromkeys(all_missing))[:4],
@@ -173,9 +184,15 @@ class CommitteeEvaluator:
         mode: CommitteeEvaluationMode = "full_committee",
     ) -> float:
         active = self.personas_for_mode(personas, mode)
-        total_weight = sum(max(persona.authorityWeight, 0.0) for persona in active) or 1.0
+        total_weight = (
+            sum(max(persona.authorityWeight, 0.0) for persona in active) or 1.0
+        )
         return round(
-            sum(persona.currentScore * max(persona.authorityWeight, 0.0) for persona in active) / total_weight,
+            sum(
+                persona.currentScore * max(persona.authorityWeight, 0.0)
+                for persona in active
+            )
+            / total_weight,
             4,
         )
 
@@ -190,7 +207,8 @@ class CommitteeEvaluator:
             return [min(personas, key=lambda persona: persona.currentScore)]
         if mode == "champion_only":
             champions = [
-                persona for persona in personas
+                persona
+                for persona in personas
                 if persona.sentiment in {"supportive", "cautiously_interested"}
             ]
             return champions or personas
@@ -203,13 +221,15 @@ class CommitteeEvaluator:
     ) -> SectionEvaluation:
         content = section.content
         content_keywords = _token_set(content)
-        persona_keywords = _token_set(" ".join(
-            persona.priorities
-            + persona.concerns
-            + persona.decisionCriteria
-            + persona.likelyObjections
-            + persona.whatWinsThemOver
-        ))
+        persona_keywords = _token_set(
+            " ".join(
+                persona.priorities
+                + persona.concerns
+                + persona.decisionCriteria
+                + persona.likelyObjections
+                + persona.whatWinsThemOver
+            )
+        )
 
         overlap = len(content_keywords & persona_keywords)
         relevance = _bounded(0.22 + overlap * 0.08)
@@ -219,9 +239,13 @@ class CommitteeEvaluator:
             + min(len(section.proofPoints), 3) * 0.11
         )
         persuasion_bonus = 0.08 if section.cta else 0.0
-        persuasion_bonus += 0.08 if any(
-            _contains_phrase(content, phrase) for phrase in persona.whatWinsThemOver
-        ) else 0.0
+        persuasion_bonus += (
+            0.08
+            if any(
+                _contains_phrase(content, phrase) for phrase in persona.whatWinsThemOver
+            )
+            else 0.0
+        )
         persuasiveness = _bounded(0.2 + overlap * 0.06 + persuasion_bonus)
 
         risk_flags = _risk_flags(self.profile, persona, section)
@@ -236,11 +260,15 @@ class CommitteeEvaluator:
             + risk_score * 0.10
             + completeness * 0.10
         )
-        quote = _reaction_quote(persona, risk_flags, missing, composite, self.thresholds)
+        quote = _reaction_quote(
+            persona, risk_flags, missing, composite, self.thresholds
+        )
         emotional = (
             "positive"
             if composite >= self.thresholds.positiveEmotion
-            else "negative" if composite < 0.42 else "neutral"
+            else "negative"
+            if composite < 0.42
+            else "neutral"
         )
 
         return SectionEvaluation(
@@ -268,20 +296,30 @@ class CommitteeEvaluator:
             self.warnings.append(message)
 
 
-def _risk_flags(profile: IndustryProfile, persona: CommitteePersona, section: DocumentSection) -> List[str]:
+def _risk_flags(
+    profile: IndustryProfile, persona: CommitteePersona, section: DocumentSection
+) -> List[str]:
     flags: List[str] = []
     lowered = section.content.lower()
     persona_context = " ".join(
-        [persona.title, persona.roleInDecision] + persona.concerns + persona.decisionCriteria
+        [persona.title, persona.roleInDecision]
+        + persona.concerns
+        + persona.decisionCriteria
     ).lower()
 
     if section.stats and len(section.proofPoints) == 0:
         flags.append("Claims need source attribution.")
     if any(token in lowered for token in ("ai", "autonomous", "automate")) and any(
-        marker in persona_context for marker in ("liability", "control", "trust", "skeptic", "risk")
+        marker in persona_context
+        for marker in ("liability", "control", "trust", "skeptic", "risk")
     ):
         flags.append("AI framing may trigger skepticism.")
-    if persona.skepticismLevel >= 8 and len(section.stats) >= 3 and "sample" not in lowered and "caveat" not in lowered:
+    if (
+        persona.skepticismLevel >= 8
+        and len(section.stats) >= 3
+        and "sample" not in lowered
+        and "caveat" not in lowered
+    ):
         flags.append("Bold statistics may not survive scrutiny.")
 
     for rule in profile.risk_rules:
@@ -291,10 +329,16 @@ def _risk_flags(profile: IndustryProfile, persona: CommitteePersona, section: Do
     return list(dict.fromkeys(flags))[:3]
 
 
-def _matches_rule(rule: IndustryRiskRule, lowered_content: str, persona_context: str) -> bool:
-    if rule.present_terms and not any(term in lowered_content for term in rule.present_terms):
+def _matches_rule(
+    rule: IndustryRiskRule, lowered_content: str, persona_context: str
+) -> bool:
+    if rule.present_terms and not any(
+        term in lowered_content for term in rule.present_terms
+    ):
         return False
-    if rule.persona_keywords and not any(keyword in persona_context for keyword in rule.persona_keywords):
+    if rule.persona_keywords and not any(
+        keyword in persona_context for keyword in rule.persona_keywords
+    ):
         return False
     if rule.absent_terms and any(term in lowered_content for term in rule.absent_terms):
         return False
@@ -326,7 +370,9 @@ def _reaction_quote(
         return f"This section speaks directly to my priorities around {persona.priorities[0].lower()}."
     if composite >= thresholds.cautiousQuote:
         return "This is moving in the right direction, but I need one more concrete proof point."
-    return "I'm not convinced yet; this still feels too generic for our buying committee."
+    return (
+        "I'm not convinced yet; this still feels too generic for our buying committee."
+    )
 
 
 def _contains_phrase(content: str, phrase: str) -> bool:

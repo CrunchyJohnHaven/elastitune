@@ -1,16 +1,18 @@
-import re
 import json
-import string
-from typing import List, Dict, Any, Optional
-from ..models.contracts import EvalCase, SampleDoc, ConnectionSummary
+from typing import List, Dict
+from ..models.contracts import EvalCase, ConnectionSummary
 
 
 class SyntheticQueryGenerator:
     def __init__(self, llm_service=None):
         self.llm = llm_service
 
-    async def generate(self, summary: ConnectionSummary, sample_docs: List[Dict],
-                       target_count: int = 100) -> List[EvalCase]:
+    async def generate(
+        self,
+        summary: ConnectionSummary,
+        sample_docs: List[Dict],
+        target_count: int = 100,
+    ) -> List[EvalCase]:
         """Generate eval cases from sample docs."""
         if self.llm and self.llm.available:
             return await self._llm_generate(summary, sample_docs, target_count)
@@ -18,10 +20,10 @@ class SyntheticQueryGenerator:
 
     async def _llm_generate(self, summary, sample_docs, target_count) -> List[EvalCase]:
         """Use LLM to generate queries."""
-        import json
 
         # Load prompt template
         from pathlib import Path
+
         prompt_path = Path(__file__).parent.parent / "prompts" / "synthetic_queries.txt"
         prompt_template = prompt_path.read_text()
 
@@ -30,33 +32,47 @@ class SyntheticQueryGenerator:
 
         for doc in sample_docs[:target_count]:
             try:
-                user_msg = json.dumps({
-                    "domain": summary.detectedDomain,
-                    "document": {
-                        "id": doc.get("_id", "unknown"),
-                        "fields": {k: str(v)[:200] for k, v in doc.get("_source", {}).items()},
+                user_msg = json.dumps(
+                    {
+                        "domain": summary.detectedDomain,
+                        "document": {
+                            "id": doc.get("_id", "unknown"),
+                            "fields": {
+                                k: str(v)[:200]
+                                for k, v in doc.get("_source", {}).items()
+                            },
+                        },
+                        "generate_count": per_doc,
                     },
-                    "generate_count": per_doc
-                }, indent=2)
+                    indent=2,
+                )
 
                 result = await self.llm.complete_json(prompt_template, user_msg)
                 if isinstance(result, list):
                     for item in result[:per_doc]:
-                        eval_cases.append(EvalCase(
-                            id=f"eval_{len(eval_cases):04d}",
-                            query=item.get("query", ""),
-                            relevantDocIds=item.get("relevantDocIds", [doc.get("_id")]),
-                            personaHint=item.get("personaHint"),
-                            difficulty=item.get("difficulty", "medium"),
-                        ))
+                        eval_cases.append(
+                            EvalCase(
+                                id=f"eval_{len(eval_cases):04d}",
+                                query=item.get("query", ""),
+                                relevantDocIds=item.get(
+                                    "relevantDocIds", [doc.get("_id")]
+                                ),
+                                personaHint=item.get("personaHint"),
+                                difficulty=item.get("difficulty", "medium"),
+                            )
+                        )
                 elif isinstance(result, dict) and "query" in result:
-                    eval_cases.append(EvalCase(
-                        id=f"eval_{len(eval_cases):04d}",
-                        query=result["query"],
-                        relevantDocIds=result.get("relevantDocIds", [doc.get("_id")]),
-                        personaHint=result.get("personaHint"),
-                        difficulty=result.get("difficulty", "medium"),
-                    ))
+                    eval_cases.append(
+                        EvalCase(
+                            id=f"eval_{len(eval_cases):04d}",
+                            query=result["query"],
+                            relevantDocIds=result.get(
+                                "relevantDocIds", [doc.get("_id")]
+                            ),
+                            personaHint=result.get("personaHint"),
+                            difficulty=result.get("difficulty", "medium"),
+                        )
+                    )
             except Exception:
                 continue
 
@@ -68,8 +84,9 @@ class SyntheticQueryGenerator:
 
         return eval_cases[:target_count]
 
-    def _heuristic_generate(self, summary: ConnectionSummary, sample_docs: List[Dict],
-                             target_count: int) -> List[EvalCase]:
+    def _heuristic_generate(
+        self, summary: ConnectionSummary, sample_docs: List[Dict], target_count: int
+    ) -> List[EvalCase]:
         """Fallback heuristic query generation."""
         eval_cases = []
 
@@ -104,24 +121,28 @@ class SyntheticQueryGenerator:
                 # Short keyword query from title words
                 words = [w for w in title_val.split() if len(w) > 3 and w.isalpha()][:4]
                 if words:
-                    eval_cases.append(EvalCase(
-                        id=f"eval_{len(eval_cases):04d}",
-                        query=" ".join(words),
-                        relevantDocIds=[doc_id],
-                        difficulty="easy",
-                    ))
+                    eval_cases.append(
+                        EvalCase(
+                            id=f"eval_{len(eval_cases):04d}",
+                            query=" ".join(words),
+                            relevantDocIds=[doc_id],
+                            difficulty="easy",
+                        )
+                    )
 
             if body_val and len(eval_cases) < target_count:
                 # Natural language query from first sentence
                 sentences = body_val.split(".")
                 first = sentences[0].strip() if sentences else ""
                 if 10 < len(first) < 120:
-                    eval_cases.append(EvalCase(
-                        id=f"eval_{len(eval_cases):04d}",
-                        query=first,
-                        relevantDocIds=[doc_id],
-                        difficulty="medium",
-                    ))
+                    eval_cases.append(
+                        EvalCase(
+                            id=f"eval_{len(eval_cases):04d}",
+                            query=first,
+                            relevantDocIds=[doc_id],
+                            difficulty="medium",
+                        )
+                    )
 
             if len(eval_cases) >= target_count:
                 break

@@ -22,6 +22,9 @@ async function reconnectFromReport(report: ReportPayload) {
   if (!report.connectionConfig) {
     throw new Error('Saved report is missing connection details.');
   }
+  if (report.connectionConfig.hasApiKey && !report.connectionConfig.apiKey) {
+    throw new Error('Saved report came from a secured cluster. Reconnect from the landing page and enter the Elasticsearch API key again.');
+  }
   return api.connect({
     mode: report.connectionConfig.mode,
     esUrl: report.connectionConfig.esUrl ?? undefined,

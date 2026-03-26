@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from .models import CommitteeExportPayload, CommitteeReport, CommitteeReportSummary, CommitteeSectionExport
+from .models import (
+    CommitteeExportPayload,
+    CommitteeReport,
+    CommitteeReportSummary,
+    CommitteeSectionExport,
+)
 from .runtime import CommitteeRunContext
 
 
@@ -46,7 +51,9 @@ def build_export_payload(ctx: CommitteeRunContext) -> CommitteeExportPayload:
                 optimizedContent=optimized.content,
             )
         )
-    sorted_personas = sorted(ctx.personas, key=lambda persona: persona.authorityWeight, reverse=True)
+    sorted_personas = sorted(
+        ctx.personas, key=lambda persona: persona.authorityWeight, reverse=True
+    )
     excluded_titles = ("thank you", "appendix", "agenda")
     weak_sections = []
     for persona in sorted_personas:

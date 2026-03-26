@@ -53,8 +53,14 @@ class CommitteeRewriteEngine:
     ) -> RewriteProposal:
         parameter_space = {**BASE_PARAMETER_VALUES, **self.profile.parameter_values}
         chosen_parameter = parameter_name or rng.choice(list(parameter_space.keys()))
-        current_value = state.get(section.id, {}).get(chosen_parameter, parameter_space[chosen_parameter][0])
-        candidates = [value for value in parameter_space[chosen_parameter] if value != current_value]
+        current_value = state.get(section.id, {}).get(
+            chosen_parameter, parameter_space[chosen_parameter][0]
+        )
+        candidates = [
+            value
+            for value in parameter_space[chosen_parameter]
+            if value != current_value
+        ]
         new_value = rng.choice(candidates)
 
         if self.llm and self.llm.available:
@@ -83,7 +89,9 @@ class CommitteeRewriteEngine:
                     chosen_parameter,
                     exc,
                 )
-                self._warn_once("AI rewrite generation failed for one or more sections; rule-based rewriting was used instead.")
+                self._warn_once(
+                    "AI rewrite generation failed for one or more sections; rule-based rewriting was used instead."
+                )
 
         return RewriteProposal(
             section_id=section.id,
@@ -91,7 +99,9 @@ class CommitteeRewriteEngine:
             old_value=current_value,
             new_value=new_value,
             description=_description(chosen_parameter, new_value),
-            rewritten_text=_heuristic_rewrite(self.profile, section, chosen_parameter, new_value),
+            rewritten_text=_heuristic_rewrite(
+                self.profile, section, chosen_parameter, new_value
+            ),
         )
 
     def _warn_once(self, message: str) -> None:
@@ -184,7 +194,9 @@ def _heuristic_rewrite(
     return text
 
 
-def _rewrite_stat_framing(text: str, sentences: list[str], section: DocumentSection, new_value: str) -> str:
+def _rewrite_stat_framing(
+    text: str, sentences: list[str], section: DocumentSection, new_value: str
+) -> str:
     if not sentences:
         return text
     lead = sentences[0]
@@ -192,7 +204,11 @@ def _rewrite_stat_framing(text: str, sentences: list[str], section: DocumentSect
     stat = section.stats[0] if section.stats else "the measurable impact"
 
     if new_value == "conservative":
-        prefix = f"Based on the available evidence, {lead[0].lower() + lead[1:]}" if lead else text
+        prefix = (
+            f"Based on the available evidence, {lead[0].lower() + lead[1:]}"
+            if lead
+            else text
+        )
         suffix = "These figures should be interpreted as directional and validated against the buyer's operating context."
         return " ".join(part for part in [prefix, remainder, suffix] if part).strip()
     if new_value == "aggressive":
@@ -202,7 +218,9 @@ def _rewrite_stat_framing(text: str, sentences: list[str], section: DocumentSect
     return " ".join(part for part in [lead, remainder, suffix] if part).strip()
 
 
-def _rewrite_proof_density(profile: IndustryProfile, text: str, section: DocumentSection, new_value: str) -> str:
+def _rewrite_proof_density(
+    profile: IndustryProfile, text: str, section: DocumentSection, new_value: str
+) -> str:
     existing = list(dict.fromkeys(section.proofPoints))[:3]
     fallback = {
         "government": "public-sector deployment proof",
@@ -232,11 +250,15 @@ def _cta_text(profile: IndustryProfile, new_value: str) -> str:
     if new_value == "soft":
         return f"If useful, we would welcome a short {noun} to validate fit."
     if new_value == "firm":
-        return f"The next step is a 60-minute {noun} this month to validate scope and fit."
+        return (
+            f"The next step is a 60-minute {noun} this month to validate scope and fit."
+        )
     return f"Schedule the 60-minute {noun} now so the team can pressure-test the plan this month."
 
 
-def _prepend_objection_preemption(text: str, profile: IndustryProfile, new_value: str) -> str:
+def _prepend_objection_preemption(
+    text: str, profile: IndustryProfile, new_value: str
+) -> str:
     if new_value == "none":
         return text
     preface_map = {
@@ -254,7 +276,12 @@ def _prepend_objection_preemption(text: str, profile: IndustryProfile, new_value
 
 def _rewrite_technical_depth(text: str, new_value: str) -> str:
     if new_value == "executive":
-        trimmed = re.sub(r"\b(architecture|kubernetes|api|certificate|ingest|replication|cluster|deployment)\b", "", text, flags=re.I)
+        trimmed = re.sub(
+            r"\b(architecture|kubernetes|api|certificate|ingest|replication|cluster|deployment)\b",
+            "",
+            text,
+            flags=re.I,
+        )
         trimmed = re.sub(r"\s{2,}", " ", trimmed).strip()
         return f"{trimmed} The emphasis stays on outcomes, adoption, and governance."
     if new_value == "practitioner":
@@ -282,7 +309,9 @@ def _rewrite_social_proof(profile: IndustryProfile, text: str, new_value: str) -
     return f"{text} {proof}"
 
 
-def _rewrite_specificity(profile: IndustryProfile, section: DocumentSection, text: str, new_value: str) -> str:
+def _rewrite_specificity(
+    profile: IndustryProfile, section: DocumentSection, text: str, new_value: str
+) -> str:
     if new_value == "general":
         return text
     if new_value == "role_tailored":

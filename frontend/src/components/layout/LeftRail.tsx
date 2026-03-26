@@ -61,11 +61,12 @@ function QuickStat({ label, value, color }: { label: string; value: string | num
 
 export default function LeftRail() {
   const experiments = useAppStore(state => state.runSnapshot?.experiments) ?? EMPTY_EXPERIMENTS;
-  const improvementPct = useAppStore(state => state.runSnapshot?.metrics?.improvementPct);
+  const metrics = useAppStore(state => state.runSnapshot?.metrics);
+  const improvementPct = metrics?.improvementPct;
 
-  const kept = experiments.filter(e => e.decision === 'kept').length;
+  const kept = experiments.filter(e => e.decision === 'kept').length + (metrics?.priorImprovementsKept ?? 0);
   const reverted = experiments.filter(e => e.decision === 'reverted').length;
-  const total = experiments.length;
+  const total = experiments.length + (metrics?.priorExperimentsRun ?? 0);
   const gainPct = improvementPct != null
     ? `+${improvementPct.toFixed(1)}%`
     : '—';

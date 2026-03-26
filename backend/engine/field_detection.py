@@ -48,13 +48,50 @@ def detect_domain(field_names: List[str], sample_text: str) -> str:
     """Detect domain: security, developer_docs, compliance, or general."""
     text = (sample_text + " ".join(field_names)).lower()
 
-    security_terms = ["alert", "rule", "host", "ip", "user", "process", "malware",
-                      "incident", "authentication", "firewall", "threat", "attack",
-                      "soc", "cve", "vulnerability", "detection"]
-    dev_terms = ["api", "sdk", "endpoint", "request", "response", "error",
-                 "deployment", "container", "code", "library", "function", "method"]
-    compliance_terms = ["policy", "control", "regulation", "audit", "evidence",
-                        "exception", "risk", "privacy", "retention", "compliance"]
+    security_terms = [
+        "alert",
+        "rule",
+        "host",
+        "ip",
+        "user",
+        "process",
+        "malware",
+        "incident",
+        "authentication",
+        "firewall",
+        "threat",
+        "attack",
+        "soc",
+        "cve",
+        "vulnerability",
+        "detection",
+    ]
+    dev_terms = [
+        "api",
+        "sdk",
+        "endpoint",
+        "request",
+        "response",
+        "error",
+        "deployment",
+        "container",
+        "code",
+        "library",
+        "function",
+        "method",
+    ]
+    compliance_terms = [
+        "policy",
+        "control",
+        "regulation",
+        "audit",
+        "evidence",
+        "exception",
+        "risk",
+        "privacy",
+        "retention",
+        "compliance",
+    ]
 
     def score(terms):
         return sum(1 for t in terms if t in text)
@@ -71,15 +108,26 @@ def detect_domain(field_names: List[str], sample_text: str) -> str:
     return "general"
 
 
-def build_baseline_profile(text_fields: List[str], vector_field: Optional[str] = None,
-                            vector_dims: Optional[int] = None) -> Dict:
+def build_baseline_profile(
+    text_fields: List[str],
+    vector_field: Optional[str] = None,
+    vector_dims: Optional[int] = None,
+) -> Dict:
     """Build default search profile for detected fields."""
     # Priority field name matching
     priority = {
-        "title": 3.0, "name": 3.0, "headline": 3.0, "subject": 3.0,
-        "summary": 2.0, "abstract": 2.0,
-        "description": 1.5, "message": 1.5, "excerpt": 1.5,
-        "body": 1.0, "content": 1.0, "text": 1.0,
+        "title": 3.0,
+        "name": 3.0,
+        "headline": 3.0,
+        "subject": 3.0,
+        "summary": 2.0,
+        "abstract": 2.0,
+        "description": 1.5,
+        "message": 1.5,
+        "excerpt": 1.5,
+        "body": 1.0,
+        "content": 1.0,
+        "text": 1.0,
     }
 
     lexical_fields = []

@@ -8,7 +8,9 @@ from ..models.contracts import LlmConfig, RunStage
 
 CommitteeProductMode = Literal["committee"]
 CommitteeDecision = Literal["kept", "reverted"]
-CommitteeSentiment = Literal["supportive", "cautiously_interested", "neutral", "skeptical", "opposed"]
+CommitteeSentiment = Literal[
+    "supportive", "cautiously_interested", "neutral", "skeptical", "opposed"
+]
 CommitteeEmotion = Literal["positive", "neutral", "negative"]
 CommitteeEvaluationMode = Literal["full_committee", "adversarial", "champion_only"]
 CommitteeEvaluationSource = Literal["llm", "heuristic", "mixed"]
@@ -225,6 +227,9 @@ class CommitteeSnapshot(BaseModel):
     warnings: List[str] = []
     startedAt: Optional[str] = None
     completedAt: Optional[str] = None
+
+    def sanitize_for_client(self) -> "CommitteeSnapshot":
+        return self.model_copy(deep=True)
 
 
 class CommitteeReportSummary(BaseModel):

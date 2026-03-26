@@ -1,13 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-import importlib.resources
 import json
 import logging
 import math
 import random
 import time
-import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -17,14 +15,10 @@ from ..models.contracts import (
     ConnectionSummary,
     EvalCase,
     ExperimentRecord,
-    HeroMetrics,
-    LlmConfig,
-    PersonaDefinition,
-    PersonaRuntime,
     PersonaViewModel,
+    SearchProfileChange,
     SearchProfile,
 )
-from ..models.report import ReportPayload
 from ..models.runtime import ConnectionContext, RunContext
 
 logger = logging.getLogger(__name__)
@@ -126,30 +120,246 @@ _FALLBACK_PERSONAS: List[Dict[str, Any]] = [
     }
     for i, (name, role, dept, arch, goal, orbit, colorSeed, queries) in enumerate(
         [
-            ("Alex", "SOC Analyst", "Security", "Power User", "Find active CVEs", 1, 42, ["openssl rce 2024", "critical vulnerabilities this month"]),
-            ("Sam", "Threat Hunter", "Security", "Expert", "Hunt lateral movement", 1, 77, ["lateral movement detection", "mimikatz indicators"]),
-            ("Jordan", "CISO", "Executive", "Casual", "Board-level risk summary", 2, 15, ["top critical risks", "compliance status"]),
-            ("Taylor", "DevSecOps", "Engineering", "Power User", "Patch prioritisation", 1, 88, ["patch tuesday", "cvss 9+ 2024"]),
-            ("Morgan", "Incident Responder", "Security", "Expert", "Rapid triage", 1, 23, ["ransomware ioc", "active exploitation"]),
-            ("Casey", "Vulnerability Manager", "IT", "Expert", "Asset risk scoring", 2, 55, ["affected products nginx", "unpatched critical"]),
-            ("Riley", "Compliance Officer", "Legal", "Casual", "Regulatory mapping", 3, 31, ["gdpr security controls", "soc2 vulnerabilities"]),
-            ("Drew", "Pen Tester", "Security", "Expert", "Exploit research", 1, 66, ["exploit poc available", "metasploit modules"]),
-            ("Avery", "Security Architect", "Engineering", "Power User", "Design guidance", 2, 12, ["zero trust architecture", "cloud misconfigurations"]),
-            ("Blake", "Cloud Engineer", "DevOps", "Casual", "Cloud CVEs", 2, 99, ["aws security advisory", "kubernetes cve"]),
-            ("Charlie", "Data Privacy", "Legal", "Casual", "Data exposure risks", 3, 44, ["data leak cve", "pii exposure vulnerability"]),
-            ("Dana", "Red Team Lead", "Security", "Expert", "Attack simulation", 1, 78, ["privilege escalation windows", "credential dumping"]),
-            ("Evan", "Blue Team", "Security", "Power User", "Defence hardening", 1, 33, ["mitigation controls", "hardening guides"]),
-            ("Fran", "IT Manager", "IT", "Casual", "Operational impact", 2, 61, ["service disruption vulnerability", "availability impact"]),
-            ("Glen", "App Dev", "Engineering", "Casual", "Dependency auditing", 2, 17, ["log4j cve", "npm package vulnerability"]),
-            ("Hana", "Audit Lead", "Compliance", "Power User", "Evidence collection", 3, 84, ["audit finding cve", "control effectiveness"]),
-            ("Ivan", "Network Engineer", "IT", "Expert", "Network CVEs", 2, 50, ["cisco ios vulnerability", "fortinet critical"]),
-            ("Jess", "Malware Analyst", "Security", "Expert", "Malware signatures", 1, 25, ["trojan indicators", "botnet c2 cve"]),
-            ("Kim", "Product Security", "Engineering", "Power User", "Product risk", 2, 72, ["supply chain attack", "open source risk"]),
-            ("Lee", "Security Trainer", "HR", "Casual", "Training content", 3, 38, ["phishing cve", "social engineering"]),
-            ("Mel", "CTO", "Executive", "Casual", "Technology risk", 3, 91, ["infrastructure vulnerabilities", "critical patch"]),
-            ("Nora", "Forensics Analyst", "Security", "Expert", "Digital evidence", 1, 56, ["log4shell forensics", "post-exploitation artifacts"]),
-            ("Omar", "Bug Bounty", "External", "Expert", "Vulnerability research", 1, 14, ["out-of-bounds write", "use after free 2024"]),
-            ("Pat", "Security PM", "Product", "Casual", "Sprint planning", 2, 69, ["security backlog items", "high severity backlog"]),
+            (
+                "Alex",
+                "SOC Analyst",
+                "Security",
+                "Power User",
+                "Find active CVEs",
+                1,
+                42,
+                ["openssl rce 2024", "critical vulnerabilities this month"],
+            ),
+            (
+                "Sam",
+                "Threat Hunter",
+                "Security",
+                "Expert",
+                "Hunt lateral movement",
+                1,
+                77,
+                ["lateral movement detection", "mimikatz indicators"],
+            ),
+            (
+                "Jordan",
+                "CISO",
+                "Executive",
+                "Casual",
+                "Board-level risk summary",
+                2,
+                15,
+                ["top critical risks", "compliance status"],
+            ),
+            (
+                "Taylor",
+                "DevSecOps",
+                "Engineering",
+                "Power User",
+                "Patch prioritisation",
+                1,
+                88,
+                ["patch tuesday", "cvss 9+ 2024"],
+            ),
+            (
+                "Morgan",
+                "Incident Responder",
+                "Security",
+                "Expert",
+                "Rapid triage",
+                1,
+                23,
+                ["ransomware ioc", "active exploitation"],
+            ),
+            (
+                "Casey",
+                "Vulnerability Manager",
+                "IT",
+                "Expert",
+                "Asset risk scoring",
+                2,
+                55,
+                ["affected products nginx", "unpatched critical"],
+            ),
+            (
+                "Riley",
+                "Compliance Officer",
+                "Legal",
+                "Casual",
+                "Regulatory mapping",
+                3,
+                31,
+                ["gdpr security controls", "soc2 vulnerabilities"],
+            ),
+            (
+                "Drew",
+                "Pen Tester",
+                "Security",
+                "Expert",
+                "Exploit research",
+                1,
+                66,
+                ["exploit poc available", "metasploit modules"],
+            ),
+            (
+                "Avery",
+                "Security Architect",
+                "Engineering",
+                "Power User",
+                "Design guidance",
+                2,
+                12,
+                ["zero trust architecture", "cloud misconfigurations"],
+            ),
+            (
+                "Blake",
+                "Cloud Engineer",
+                "DevOps",
+                "Casual",
+                "Cloud CVEs",
+                2,
+                99,
+                ["aws security advisory", "kubernetes cve"],
+            ),
+            (
+                "Charlie",
+                "Data Privacy",
+                "Legal",
+                "Casual",
+                "Data exposure risks",
+                3,
+                44,
+                ["data leak cve", "pii exposure vulnerability"],
+            ),
+            (
+                "Dana",
+                "Red Team Lead",
+                "Security",
+                "Expert",
+                "Attack simulation",
+                1,
+                78,
+                ["privilege escalation windows", "credential dumping"],
+            ),
+            (
+                "Evan",
+                "Blue Team",
+                "Security",
+                "Power User",
+                "Defence hardening",
+                1,
+                33,
+                ["mitigation controls", "hardening guides"],
+            ),
+            (
+                "Fran",
+                "IT Manager",
+                "IT",
+                "Casual",
+                "Operational impact",
+                2,
+                61,
+                ["service disruption vulnerability", "availability impact"],
+            ),
+            (
+                "Glen",
+                "App Dev",
+                "Engineering",
+                "Casual",
+                "Dependency auditing",
+                2,
+                17,
+                ["log4j cve", "npm package vulnerability"],
+            ),
+            (
+                "Hana",
+                "Audit Lead",
+                "Compliance",
+                "Power User",
+                "Evidence collection",
+                3,
+                84,
+                ["audit finding cve", "control effectiveness"],
+            ),
+            (
+                "Ivan",
+                "Network Engineer",
+                "IT",
+                "Expert",
+                "Network CVEs",
+                2,
+                50,
+                ["cisco ios vulnerability", "fortinet critical"],
+            ),
+            (
+                "Jess",
+                "Malware Analyst",
+                "Security",
+                "Expert",
+                "Malware signatures",
+                1,
+                25,
+                ["trojan indicators", "botnet c2 cve"],
+            ),
+            (
+                "Kim",
+                "Product Security",
+                "Engineering",
+                "Power User",
+                "Product risk",
+                2,
+                72,
+                ["supply chain attack", "open source risk"],
+            ),
+            (
+                "Lee",
+                "Security Trainer",
+                "HR",
+                "Casual",
+                "Training content",
+                3,
+                38,
+                ["phishing cve", "social engineering"],
+            ),
+            (
+                "Mel",
+                "CTO",
+                "Executive",
+                "Casual",
+                "Technology risk",
+                3,
+                91,
+                ["infrastructure vulnerabilities", "critical patch"],
+            ),
+            (
+                "Nora",
+                "Forensics Analyst",
+                "Security",
+                "Expert",
+                "Digital evidence",
+                1,
+                56,
+                ["log4shell forensics", "post-exploitation artifacts"],
+            ),
+            (
+                "Omar",
+                "Bug Bounty",
+                "External",
+                "Expert",
+                "Vulnerability research",
+                1,
+                14,
+                ["out-of-bounds write", "use after free 2024"],
+            ),
+            (
+                "Pat",
+                "Security PM",
+                "Product",
+                "Casual",
+                "Sprint planning",
+                2,
+                69,
+                ["security backlog items", "high severity backlog"],
+            ),
         ]
     )
 ]
@@ -159,7 +369,12 @@ _FALLBACK_EXPERIMENTS: List[Dict[str, Any]] = [
         "experimentId": 1,
         "timestamp": "2024-01-15T10:00:00Z",
         "hypothesis": "Increasing minimum_should_match from 75% to 85% will reduce noise for multi-word queries.",
-        "change": {"path": "minimumShouldMatch", "before": "75%", "after": "85%", "label": "minimumShouldMatch 75% → 85%"},
+        "change": {
+            "path": "minimumShouldMatch",
+            "before": "75%",
+            "after": "85%",
+            "label": "minimumShouldMatch 75% → 85%",
+        },
         "baselineScore": 0.612,
         "candidateScore": 0.641,
         "deltaAbsolute": 0.029,
@@ -173,7 +388,12 @@ _FALLBACK_EXPERIMENTS: List[Dict[str, Any]] = [
         "experimentId": 2,
         "timestamp": "2024-01-15T10:00:05Z",
         "hypothesis": "Adding a phrase boost of 1.5 will reward exact phrase matches in security queries.",
-        "change": {"path": "phraseBoost", "before": 0.0, "after": 1.5, "label": "phraseBoost 0.0 → 1.5"},
+        "change": {
+            "path": "phraseBoost",
+            "before": 0.0,
+            "after": 1.5,
+            "label": "phraseBoost 0.0 → 1.5",
+        },
         "baselineScore": 0.641,
         "candidateScore": 0.659,
         "deltaAbsolute": 0.018,
@@ -187,7 +407,12 @@ _FALLBACK_EXPERIMENTS: List[Dict[str, Any]] = [
         "experimentId": 3,
         "timestamp": "2024-01-15T10:00:10Z",
         "hypothesis": "Switching multi-match type to cross_fields may improve recall for CVE IDs split across fields.",
-        "change": {"path": "multiMatchType", "before": "best_fields", "after": "cross_fields", "label": "multiMatchType best_fields → cross_fields"},
+        "change": {
+            "path": "multiMatchType",
+            "before": "best_fields",
+            "after": "cross_fields",
+            "label": "multiMatchType best_fields → cross_fields",
+        },
         "baselineScore": 0.659,
         "candidateScore": 0.648,
         "deltaAbsolute": -0.011,
@@ -201,7 +426,12 @@ _FALLBACK_EXPERIMENTS: List[Dict[str, Any]] = [
         "experimentId": 4,
         "timestamp": "2024-01-15T10:00:16Z",
         "hypothesis": "Tie breaker of 0.3 will reward docs that match in multiple fields for broad security queries.",
-        "change": {"path": "tieBreaker", "before": 0.0, "after": 0.3, "label": "tieBreaker 0.0 → 0.3"},
+        "change": {
+            "path": "tieBreaker",
+            "before": 0.0,
+            "after": 0.3,
+            "label": "tieBreaker 0.0 → 0.3",
+        },
         "baselineScore": 0.659,
         "candidateScore": 0.672,
         "deltaAbsolute": 0.013,
@@ -215,7 +445,12 @@ _FALLBACK_EXPERIMENTS: List[Dict[str, Any]] = [
         "experimentId": 5,
         "timestamp": "2024-01-15T10:00:22Z",
         "hypothesis": "Enabling fuzziness AUTO will help with common CVE ID typos.",
-        "change": {"path": "fuzziness", "before": "0", "after": "AUTO", "label": "fuzziness 0 → AUTO"},
+        "change": {
+            "path": "fuzziness",
+            "before": "0",
+            "after": "AUTO",
+            "label": "fuzziness 0 → AUTO",
+        },
         "baselineScore": 0.672,
         "candidateScore": 0.661,
         "deltaAbsolute": -0.011,
@@ -229,7 +464,12 @@ _FALLBACK_EXPERIMENTS: List[Dict[str, Any]] = [
         "experimentId": 6,
         "timestamp": "2024-01-15T10:00:28Z",
         "hypothesis": "Hybrid search with vector weight 0.35 will improve semantic matching for vague threat queries.",
-        "change": {"path": "useVector", "before": False, "after": True, "label": "Hybrid search enabled"},
+        "change": {
+            "path": "useVector",
+            "before": False,
+            "after": True,
+            "label": "Hybrid search enabled",
+        },
         "baselineScore": 0.672,
         "candidateScore": 0.698,
         "deltaAbsolute": 0.026,
@@ -243,7 +483,12 @@ _FALLBACK_EXPERIMENTS: List[Dict[str, Any]] = [
         "experimentId": 7,
         "timestamp": "2024-01-15T10:00:35Z",
         "hypothesis": "Increasing vector weight to 0.50 may help for ambiguous threat intelligence queries.",
-        "change": {"path": "vectorWeight", "before": 0.35, "after": 0.50, "label": "vectorWeight 0.35 → 0.50"},
+        "change": {
+            "path": "vectorWeight",
+            "before": 0.35,
+            "after": 0.50,
+            "label": "vectorWeight 0.35 → 0.50",
+        },
         "baselineScore": 0.698,
         "candidateScore": 0.694,
         "deltaAbsolute": -0.004,
@@ -257,7 +502,12 @@ _FALLBACK_EXPERIMENTS: List[Dict[str, Any]] = [
         "experimentId": 8,
         "timestamp": "2024-01-15T10:00:41Z",
         "hypothesis": "Switching fusion method to RRF (Reciprocal Rank Fusion) for more balanced hybrid scoring.",
-        "change": {"path": "fusionMethod", "before": "weighted_sum", "after": "rrf", "label": "fusionMethod weighted_sum → rrf"},
+        "change": {
+            "path": "fusionMethod",
+            "before": "weighted_sum",
+            "after": "rrf",
+            "label": "fusionMethod weighted_sum → rrf",
+        },
         "baselineScore": 0.698,
         "candidateScore": 0.714,
         "deltaAbsolute": 0.016,
@@ -333,7 +583,9 @@ class DemoService:
         self._compression_data: Dict[str, Any] = (
             _load_demo_json("demo_compression.json") or _FALLBACK_COMPRESSION
         )
-        self._report_data: Optional[Dict[str, Any]] = _load_demo_json("demo_report.json")
+        self._report_data: Optional[Dict[str, Any]] = _load_demo_json(
+            "demo_report.json"
+        )
 
     # ------------------------------------------------------------------
     # Connection
@@ -347,7 +599,9 @@ class DemoService:
             EvalCase(
                 id=f"demo_eval_{i:03d}",
                 query=q,
-                relevantDocIds=[doc["id"] for doc in self._connection_data.get("sampleDocs", [])[:2]],
+                relevantDocIds=[
+                    doc["id"] for doc in self._connection_data.get("sampleDocs", [])[:2]
+                ],
                 difficulty="medium",
                 personaHint="demo",
             )
@@ -369,7 +623,9 @@ class DemoService:
             lexicalFields=[
                 {"field": f, "boost": 2.0 if i == 0 else 1.0}
                 for i, f in enumerate(
-                    self._connection_data.get("primaryTextFields", ["title", "description"])
+                    self._connection_data.get(
+                        "primaryTextFields", ["title", "description"]
+                    )
                 )
             ],
             useVector=False,
@@ -429,7 +685,7 @@ class DemoService:
 
         personas: List[PersonaViewModel] = []
         for i, p in enumerate(data):
-            orbit = ((i % 5) + 1)
+            orbit = (i % 5) + 1
             angle = p.get("angle", (i * 2 * math.pi / len(data)))
             radius = 72.0 + (orbit * 38.0)
             try:
@@ -490,10 +746,10 @@ class DemoService:
         Replay demo_experiments.json with timing delays, updating the RunContext
         and publishing WebSocket events via run_manager.
         """
-        from ..models.contracts import ExperimentRecord, SearchProfileChange
-
         run_id = ctx.run_id
-        now_ts = lambda: datetime.now(timezone.utc).isoformat()
+
+        def now_ts() -> str:
+            return datetime.now(timezone.utc).isoformat()
 
         # Set initial baseline score from first experiment
         experiments_data = self._experiments_data
@@ -560,10 +816,14 @@ class DemoService:
                     _apply_profile_change(ctx.best_profile, change)
                     ctx.metrics.improvementsKept += 1
 
-                ctx.metrics.currentScore = record.candidateScore if record.decision == "kept" else record.baselineScore
+                ctx.metrics.currentScore = (
+                    record.candidateScore
+                    if record.decision == "kept"
+                    else record.baselineScore
+                )
                 if ctx.metrics.currentScore > ctx.metrics.bestScore:
                     ctx.metrics.bestScore = ctx.metrics.currentScore
-                    ctx._best_score = ctx.metrics.bestScore
+                    ctx.best_score = ctx.metrics.bestScore
 
                 ctx.metrics.experimentsRun = i + 1
                 ctx.metrics.improvementPct = (
@@ -622,7 +882,9 @@ class DemoService:
                             persona.failures += 1
                             persona.lastResultRank = None
                         total = persona.totalSearches
-                        persona.successRate = (persona.successes + persona.partials * 0.5) / max(total, 1)
+                        persona.successRate = (
+                            persona.successes + persona.partials * 0.5
+                        ) / max(total, 1)
 
                     ctx.metrics.personaSuccessRate = sum(
                         p.successRate for p in ctx.personas
@@ -646,7 +908,9 @@ class DemoService:
         try:
             compression = CompressionSummary(**self._compression_data)
             ctx.compression = compression
-            ctx.metrics.projectedMonthlySavingsUsd = compression.projectedMonthlySavingsUsd
+            ctx.metrics.projectedMonthlySavingsUsd = (
+                compression.projectedMonthlySavingsUsd
+            )
             await run_manager.publish(
                 run_id,
                 {
@@ -661,8 +925,12 @@ class DemoService:
         try:
             report_data = self._report_data
             duration_seconds = round(ctx.metrics.elapsedSeconds, 2)
-            top_changes = [e.change.label for e in ctx.experiments if e.decision == "kept"][:2]
-            top_changes_text = " and ".join(top_changes) if top_changes else "query weighting changes"
+            top_changes = [
+                e.change.label for e in ctx.experiments if e.decision == "kept"
+            ][:2]
+            top_changes_text = (
+                " and ".join(top_changes) if top_changes else "query weighting changes"
+            )
             dynamic_summary = {
                 "headline": (
                     f"Search quality improved {ctx.metrics.improvementPct:.1f}% on "
@@ -706,7 +974,11 @@ class DemoService:
                     "connection": ctx.summary.model_dump(),
                     "searchProfileBefore": ctx.baseline_profile.model_dump(),
                     "searchProfileAfter": ctx.best_profile.model_dump(),
-                    "diff": [e.change.model_dump() for e in ctx.experiments if e.decision == "kept"],
+                    "diff": [
+                        e.change.model_dump()
+                        for e in ctx.experiments
+                        if e.decision == "kept"
+                    ],
                     "personaImpact": [],
                     "experiments": [e.model_dump() for e in ctx.experiments],
                     "compression": ctx.compression.model_dump(),
@@ -734,7 +1006,9 @@ class DemoService:
             },
         )
 
-        logger.info("Demo run %s completed with %d experiments", run_id, len(ctx.experiments))
+        logger.info(
+            "Demo run %s completed with %d experiments", run_id, len(ctx.experiments)
+        )
 
 
 def _apply_profile_change(profile: SearchProfile, change: SearchProfileChange) -> None:

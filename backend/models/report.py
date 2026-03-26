@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional, List, Any
+from typing import Optional, List
 from .contracts import (
     CompressionSummary,
     ConnectionSummary,
@@ -50,15 +50,32 @@ class ReportSummary(BaseModel):
     improvementsKept: int
     durationSeconds: float = 0.0
     projectedMonthlySavingsUsd: Optional[float] = None
+    # Continuation tracking — populated when this run continued from a previous one
+    isContinuation: bool = False
+    originalBaselineScore: Optional[float] = None
+    totalExperimentsRun: Optional[int] = None  # Cumulative across all runs in the chain
+    totalImprovementsKept: Optional[int] = (
+        None  # Cumulative across all runs in the chain
+    )
 
 
 class ReportConnectionConfig(BaseModel):
     mode: str
     esUrl: Optional[str] = None
     apiKey: Optional[str] = None
+    hasApiKey: bool = False
     indexName: Optional[str] = None
     evalSet: List[EvalCase] = []
     llm: Optional[LlmConfig] = None
+
+    def sanitize_for_client(self) -> "ReportConnectionConfig":
+        return self.model_copy(
+            update={
+                "apiKey": None,
+                "hasApiKey": self.hasApiKey or bool(self.apiKey),
+                "llm": self.llm.sanitize_for_client() if self.llm else None,
+            }
+        )
 
 
 class ReportPayload(BaseModel):
@@ -76,4 +93,16 @@ class ReportPayload(BaseModel):
     experiments: List[ExperimentRecord]
     compression: CompressionSummary
     warnings: List[str] = []
-    previousRunId: Optional[str] = None  # Set when this run continued from a previous one
+    previousRunId: Optional[str] = (
+        None  # Set when this run continued from a previous one
+    )
+
+    def sanitize_for_client(self) -> "ReportPayload":
+        return self.model_copy(
+            update={
+                "connectionConfig": self.connectionConfig.sanitize_for_client()
+                if self.connectionConfig
+                else None
+            },
+            deep=True,
+        )

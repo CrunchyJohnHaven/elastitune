@@ -33,7 +33,9 @@ class LLMService:
             logger.warning("LLM complete failed: %s", exc)
             return None
 
-    async def _complete_openai_compatible(self, system: str, user: str) -> Optional[str]:
+    async def _complete_openai_compatible(
+        self, system: str, user: str
+    ) -> Optional[str]:
         base_url = (self.config.baseUrl or "https://api.openai.com/v1").rstrip("/")
         url = f"{base_url}/chat/completions"
 
@@ -139,7 +141,7 @@ class LLMService:
                 if isinstance(val, str) and val:
                     parts.append(val[:200])
             if parts:
-                doc_summaries.append(f'Doc {doc.get("_id", i)}: {" | ".join(parts)}')
+                doc_summaries.append(f"Doc {doc.get('_id', i)}: {' | '.join(parts)}")
 
         docs_text = "\n".join(doc_summaries)
 
@@ -252,7 +254,9 @@ class LLMService:
 
         return await self.complete_json(system_prompt, user_prompt)
 
-    async def generate_committee_personas(self, committee_description: str) -> List[Dict[str, Any]]:
+    async def generate_committee_personas(
+        self, committee_description: str
+    ) -> List[Dict[str, Any]]:
         system_prompt = (
             "You design realistic enterprise buying committees. "
             "Return grounded stakeholder personas with authority weights that sum close to 1.0."
@@ -277,10 +281,12 @@ class LLMService:
             f"Role in decision: {persona.roleInDecision}\n"
             f"Authority weight: {persona.authorityWeight}\n"
             f"Your priorities:\n- " + "\n- ".join(persona.priorities) + "\n\n"
-            f"Your concerns:\n- " + "\n- ".join(persona.concerns) + "\n\n"
-            f"Your decision criteria:\n- " + "\n- ".join(persona.decisionCriteria) + "\n\n"
-            f"Likely objections:\n- " + "\n- ".join(persona.likelyObjections) + "\n\n"
-            f"What wins you over:\n- " + "\n- ".join(persona.whatWinsThemOver) + "\n\n"
+            "Your concerns:\n- " + "\n- ".join(persona.concerns) + "\n\n"
+            "Your decision criteria:\n- "
+            + "\n- ".join(persona.decisionCriteria)
+            + "\n\n"
+            "Likely objections:\n- " + "\n- ".join(persona.likelyObjections) + "\n\n"
+            "What wins you over:\n- " + "\n- ".join(persona.whatWinsThemOver) + "\n\n"
             f"Skepticism level: {persona.skepticismLevel}/10\n\n"
             "Evaluate honestly. Do not be artificially positive. Return JSON only."
         )
@@ -336,9 +342,7 @@ class LLMService:
             f"Current section title: {section.title}\n"
             f"Current section content:\n---\n{section.content}\n---\n\n"
             f"Optimization instruction: change {parameter_name} from {old_value} to {new_value}.\n\n"
-            "Parameter definitions:\n"
-            + "\n".join(parameter_lines)
-            + "\n\n"
+            "Parameter definitions:\n" + "\n".join(parameter_lines) + "\n\n"
             "Return only the rewritten section text."
         )
         text = await self.complete(system_prompt, user_prompt)

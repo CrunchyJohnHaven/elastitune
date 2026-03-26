@@ -1,112 +1,96 @@
 # ElastiTune
 
-ElastiTune is a search-quality optimization lab for Elasticsearch. It connects to a search index, builds or accepts a benchmark query set, tests ranking changes automatically, and produces a before/after report with measurable lift.
+Autonomous Elasticsearch search-profile optimizer with a live mission-control dashboard.
 
-It also includes a second product mode, Committee Mode, for document rewrites guided by simulated buyer personas.
+![screenshot placeholder](docs/screenshot.png)
 
-## Why it exists
+## What it does
 
-- Average benchmark lift in this repo’s overnight run pack: `+335%`
-- Built-in benchmark systems: Product Store, Books Catalog, Workplace Docs, Security SIEM, TMDB Movies
-- Output: live run view, saved reports, query-by-query before/after previews, shareable HTML export
+- Connects to any Elasticsearch index (or a built-in benchmark), then runs controlled experiments across field boosts, match strategy, MSM, fuzziness, hybrid weights, and fusion settings.
+- Keeps only changes that improve nDCG@10, producing a measurable before/after lift with full experiment logs.
+- Streams every experiment result in real time over a single WebSocket — no polling, no database.
+- Includes Committee Mode: simulates a buying-committee of personas to score and iteratively rewrite proposal documents.
 
 ## Quick start
 
-### Docker Compose
+**Prerequisites:** Python 3.11+, Node 18+, a running Elasticsearch 8.x instance (or use Docker Compose below).
+
+```bash
+# 1. Install backend dependencies
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r backend/requirements.txt
+
+# 2. Configure environment
+cp .env.example .env          # edit as needed
+
+# 3. Start backend (port 8000)
+python3 -m uvicorn backend.main:app --reload --port 8000
+
+# 4. Start frontend (port 5173) — in a second terminal
+cd frontend
+npm install
+npm run dev
+```
+
+Or with Docker Compose (starts Elasticsearch, backend, and frontend together):
 
 ```bash
 docker compose up --build
 ```
 
-This starts:
+## Architecture
 
-- Elasticsearch on `http://localhost:9200`
-- FastAPI backend on `http://localhost:8000`
-- Frontend on `http://localhost`
-- Benchmark bootstrap job that loads the bundled indices
+- **Backend:** FastAPI (Python 3.11), Pydantic v2, AsyncElasticsearch, numpy/scipy, orjson. Runs on port 8000.
+- **Frontend:** React 18, TypeScript, Vite, Zustand, Tailwind CSS, HTML5 Canvas, recharts. Dev server on port 5173.
+- **Real-time:** One WebSocket per run, text frames via orjson. No database, no Redis, no task queue — all state is in-memory.
+- **Production:** `npm run build` outputs a static bundle that FastAPI serves directly from `frontend/dist/`.
 
-### Local dev
+## Running tests
 
 ```bash
-bash setup.sh
-bash start.sh
+# Backend unit tests
+python3 -m pytest backend/tests/ -v
+
+# Backend smoke test (requires running backend)
+python3 backend/scripts/smoke_app.py
+
+# Frontend type check + build verification
+cd frontend && npx tsc --noEmit && npm run build
 ```
 
-Frontend: `http://localhost:5173`  
-Backend: `http://localhost:8000`
+## Benchmarks
 
-## Product modes
+Five benchmark datasets are bundled. Load them all into a local Elasticsearch instance:
 
-### Search Mode
-
-1. Connect to an Elasticsearch index or choose a benchmark preset.
-2. Build or upload a test-search set.
-3. Run experiments across field boosts, match strategy, MSM, fuzziness, hybrid weights, and fusion settings.
-4. Keep only improvements based on real nDCG@10 evaluation.
-5. Export a report with profile diff, experiment log, per-query before/after results, and reusable query DSL.
-
-### Committee Mode
-
-1. Upload a proposal, brief, or deck.
-2. Generate or seed a buying committee.
-3. Score sections across personas and rewrite iteratively.
-4. Keep rewrites only when the consensus score improves without violating the do-no-harm floor.
-5. Export a rewrite report and handoff payload.
-
-## Built-in benchmarks
+```bash
+python3 benchmarks/setup.py          # initial load
+python3 benchmarks/setup.py --reset  # wipe and reload
+```
 
 | Benchmark | Index | Docs | Eval queries |
 |---|---|---:|---:|
 | Product Store | `products-catalog` | 931 | 8 |
 | Books Catalog | `books-catalog` | 2,000 | 12 |
-| Workplace Docs | `workplace-docs` | 15 | 12 |
+| Workplace Docs | `workplace-docs` | 15 | 16 |
 | Security SIEM | `security-siem` | 301 | 18 |
 | TMDB Movies | `tmdb` | 8,516 | 12 |
 
-Set them all up locally with:
+## Deploy to Replit
+
+`replit.nix` and `.replit` are included. Import the repo into Replit, set the environment variables from `.env.example` in the Replit Secrets panel, then run:
 
 ```bash
-python3 benchmarks/setup.py
+bash setup.sh && bash start.sh
 ```
 
-Reset and rebuild:
+The backend will bind to `0.0.0.0` on the port Replit assigns; update `CORS_ORIGINS` in Secrets to match your Replit dev URL.
 
-```bash
-python3 benchmarks/setup.py --reset
-```
+## Stack
 
-## Architecture
-
-```text
-backend/
-  api/          REST + WebSocket routes
-  committee/    committee-mode ingestion, evaluation, rewrite logic
-  models/       Pydantic contracts
-  services/     orchestration, Elasticsearch client, persistence, reports
-frontend/
-  components/   connect, run, report, committee UI
-  screens/      landing, run, report, benchmarks
-  store/        Zustand app state
-benchmarks/
-  */            datasets, eval sets, index bootstrap scripts
-```
-
-## Testing
-
-```bash
-python3 -m pytest backend/tests -q
-python3 backend/scripts/smoke_app.py
-cd frontend && npx tsc --noEmit && npm run build
-```
-
-## Deployment notes
-
-- `docker-compose.yml` provides the easiest local or Replit-adjacent deployment path.
-- `.github/workflows/ci.yml` runs backend tests plus frontend typecheck/build on push and pull request.
-- `.replit` and `replit.nix` are included for Replit bootstrapping.
-
-## Contributing
-
-1. Keep benchmark and report behavior truthful to the underlying Elasticsearch run.
-2. Prefer explainable UI over decorative motion.
-3. Run the full verification commands before shipping.
+| Layer | Technology |
+|---|---|
+| Backend | FastAPI, Uvicorn, Pydantic v2, AsyncElasticsearch |
+| Frontend | React 18, TypeScript, Vite, Tailwind CSS, Zustand |
+| Visualization | HTML5 Canvas, recharts, framer-motion |
+| Evaluation | nDCG@10 computed in-process with numpy/scipy |
+| Packaging | Docker Compose, Replit |

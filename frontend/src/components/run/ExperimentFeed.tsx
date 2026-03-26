@@ -35,6 +35,7 @@ const ExperimentRow = memo(function ExperimentRow({ experiment }: { experiment: 
   const isKept = experiment.decision === 'kept';
   const deltaPositive = experiment.deltaAbsolute >= 0;
   const time = formatTimestamp(experiment.timestamp);
+  const beforeScore = experiment.beforeScore ?? experiment.baselineScore ?? 0;
 
   return (
     <div
@@ -127,7 +128,7 @@ const ExperimentRow = memo(function ExperimentRow({ experiment }: { experiment: 
             color: '#9AA4B2',
           }}
         >
-          {formatScore(experiment.baselineScore)}
+          {formatScore(beforeScore)}
         </span>
         <span style={{ color: '#4B5563', fontSize: 9 }}>→</span>
         <span

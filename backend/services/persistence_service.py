@@ -14,11 +14,18 @@ class PersistenceService:
     """SQLite-backed storage for completed search runs and reports."""
 
     def __init__(self, db_path: Optional[str] = None) -> None:
-        self.db_path = db_path or str(Path(__file__).resolve().parent.parent / "data" / "elastitune.db")
+        self.db_path = db_path or str(
+            Path(__file__).resolve().parent.parent / "data" / "elastitune.db"
+        )
         self._lock = asyncio.Lock()
+        self._conn: Optional[sqlite3.Connection] = None
 
     async def init(self) -> None:
         await asyncio.to_thread(self._init_sync)
+
+    async def close(self) -> None:
+        async with self._lock:
+            await asyncio.to_thread(self._close_sync)
 
     async def save_connection(self, payload: Dict[str, Any]) -> None:
         async with self._lock:
@@ -56,14 +63,22 @@ class PersistenceService:
         index_name: Optional[str] = None,
         completed_only: bool = False,
     ) -> List[Dict[str, Any]]:
-        rows = await asyncio.to_thread(self._list_runs_sync, limit, index_name, completed_only)
+        rows = await asyncio.to_thread(
+            self._list_runs_sync, limit, index_name, completed_only
+        )
         return [dict(row) for row in rows]
 
     def _connect(self) -> sqlite3.Connection:
-        Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        return conn
+        if self._conn is None:
+            Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
+            self._conn = sqlite3.connect(self.db_path, check_same_thread=False)
+            self._conn.row_factory = sqlite3.Row
+        return self._conn
+
+    def _close_sync(self) -> None:
+        if self._conn is not None:
+            self._conn.close()
+            self._conn = None
 
     def _init_sync(self) -> None:
         with self._connect() as conn:
@@ -105,6 +120,7 @@ class PersistenceService:
             conn.commit()
 
     def _save_connection_sync(self, payload: Dict[str, Any]) -> None:
+        sanitized_payload = self._sanitize_connection_payload(payload)
         with self._connect() as conn:
             conn.execute(
                 """
@@ -120,13 +136,13 @@ class PersistenceService:
                     created_at=excluded.created_at
                 """,
                 (
-                    payload["connection_id"],
-                    payload["mode"],
-                    payload.get("es_url"),
-                    payload.get("api_key"),
-                    payload.get("index_name"),
-                    json.dumps(payload),
-                    payload["created_at"],
+                    sanitized_payload["connection_id"],
+                    sanitized_payload["mode"],
+                    sanitized_payload.get("es_url"),
+                    None,
+                    sanitized_payload.get("index_name"),
+                    json.dumps(sanitized_payload),
+                    sanitized_payload["created_at"],
                 ),
             )
             conn.commit()
@@ -175,6 +191,7 @@ class PersistenceService:
             )
 
     def _save_report_sync(self, report: ReportPayload) -> None:
+        sanitized_report = report.sanitize_for_client()
         with self._connect() as conn:
             conn.execute(
                 """
@@ -185,9 +202,9 @@ class PersistenceService:
                     generated_at=excluded.generated_at
                 """,
                 (
-                    report.runId,
-                    report.model_dump_json(),
-                    report.generatedAt,
+                    sanitized_report.runId,
+                    sanitized_report.model_dump_json(),
+                    sanitized_report.generatedAt,
                 ),
             )
             conn.commit()
@@ -250,3 +267,13 @@ class PersistenceService:
                 """,
                 (*params, limit),
             ).fetchall()
+
+    def _sanitize_connection_payload(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        sanitized = dict(payload)
+        sanitized["api_key"] = None
+        llm_config = sanitized.get("llm_config")
+        if isinstance(llm_config, dict):
+            llm_copy = dict(llm_config)
+            llm_copy["apiKey"] = None
+            sanitized["llm_config"] = llm_copy
+        return sanitized

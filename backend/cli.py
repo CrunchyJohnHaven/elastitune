@@ -28,8 +28,12 @@ async def _build_connection(
     try:
         cluster_info = await es.get_cluster_info()
         analysis = await es.analyze_index(index=index_name)
-        eval_set = _load_eval_set(eval_set_path) if eval_set_path else _build_heuristic_eval_set(
-            analysis["sample_docs"], analysis["text_fields"], analysis["domain"]
+        eval_set = (
+            _load_eval_set(eval_set_path)
+            if eval_set_path
+            else _build_heuristic_eval_set(
+                analysis["sample_docs"], analysis["text_fields"], analysis["domain"]
+            )
         )
         profile = SearchProfile(
             **await es.build_baseline_profile(
@@ -68,7 +72,9 @@ async def _build_connection(
 
 
 async def _run_single(args: argparse.Namespace) -> dict:
-    connection = await _build_connection(args.es_url, args.api_key, args.index, args.eval_set)
+    connection = await _build_connection(
+        args.es_url, args.api_key, args.index, args.eval_set
+    )
     personas = await _build_personas(
         persona_count=args.persona_count,
         mode="live",
@@ -94,7 +100,9 @@ async def _run_single(args: argparse.Namespace) -> dict:
 
 
 async def _probe(args: argparse.Namespace) -> dict:
-    connection = await _build_connection(args.es_url, args.api_key, args.index, args.eval_set)
+    connection = await _build_connection(
+        args.es_url, args.api_key, args.index, args.eval_set
+    )
     ctx = RunContext(
         run_id=f"probe-{args.index}",
         connection=connection,
@@ -104,7 +112,9 @@ async def _probe(args: argparse.Namespace) -> dict:
         auto_stop_on_plateau=True,
     )
     manager = RunManager()
-    baseline, misses, per_query = await manager.evaluate_detailed(ctx, connection.baseline_profile)
+    baseline, misses, per_query = await manager.evaluate_detailed(
+        ctx, connection.baseline_profile
+    )
     return {
         "index": args.index,
         "baseline_score": baseline,

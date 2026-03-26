@@ -5,6 +5,7 @@ import logging
 import uuid
 from typing import List, Optional
 
+import orjson
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 
@@ -67,11 +68,19 @@ async def connect_committee(
     provided_personas: Optional[List[CommitteePersona]] = None
     if personasJson:
         try:
-            provided_personas = [CommitteePersona(**item) for item in json.loads(personasJson)]
+            provided_personas = [
+                CommitteePersona(**item) for item in json.loads(personasJson)
+            ]
         except Exception as exc:
-            raise HTTPException(status_code=422, detail=f"Invalid personasJson payload: {exc}")
+            raise HTTPException(
+                status_code=422, detail=f"Invalid personasJson payload: {exc}"
+            )
 
-    llm_service = LLMService(llm_config) if llm_config and llm_config.provider != "disabled" else None
+    llm_service = (
+        LLMService(llm_config)
+        if llm_config and llm_config.provider != "disabled"
+        else None
+    )
     persona_build = await build_committee_personas(
         document=parsed_document,
         committee_description=committeeDescription,
@@ -159,8 +168,9 @@ async def get_committee_run(run_id: str, request: Request) -> JSONResponse:
     run_manager = _get_run_manager(request)
     snapshot = await run_manager.get_committee_snapshot(run_id)
     if not snapshot:
-        raise HTTPException(status_code=404, detail=f"Committee run '{run_id}' not found")
-    import orjson
+        raise HTTPException(
+            status_code=404, detail=f"Committee run '{run_id}' not found"
+        )
     return JSONResponse(content=orjson.loads(snapshot.model_dump_json()))
 
 
@@ -169,7 +179,9 @@ async def stop_committee_run(run_id: str, request: Request) -> StopCommitteeRunR
     run_manager = _get_run_manager(request)
     ctx = await run_manager.get_committee_run(run_id)
     if not ctx:
-        raise HTTPException(status_code=404, detail=f"Committee run '{run_id}' not found")
+        raise HTTPException(
+            status_code=404, detail=f"Committee run '{run_id}' not found"
+        )
     await run_manager.stop_committee_run(run_id)
     return StopCommitteeRunResponse(runId=run_id, stage="stopping")
 
@@ -179,15 +191,15 @@ async def get_committee_report(run_id: str, request: Request) -> JSONResponse:
     run_manager = _get_run_manager(request)
     ctx = await run_manager.get_committee_run(run_id)
     if not ctx:
-        raise HTTPException(status_code=404, detail=f"Committee run '{run_id}' not found")
+        raise HTTPException(
+            status_code=404, detail=f"Committee run '{run_id}' not found"
+        )
     if ctx.report is None:
         if ctx.stage not in ("completed", "stopping", "error"):
             raise HTTPException(status_code=409, detail="Committee run is still active")
         from ..committee.reporting import build_report
 
         ctx.report = build_report(ctx)
-
-    import orjson
 
     return JSONResponse(content=orjson.loads(ctx.report.model_dump_json()))
 
@@ -197,5 +209,7 @@ async def get_committee_export(run_id: str, request: Request) -> JSONResponse:
     run_manager = _get_run_manager(request)
     payload = await run_manager.get_committee_export(run_id)
     if payload is None:
-        raise HTTPException(status_code=404, detail=f"Committee run '{run_id}' not found")
+        raise HTTPException(
+            status_code=404, detail=f"Committee run '{run_id}' not found"
+        )
     return JSONResponse(content=payload)

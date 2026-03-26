@@ -6,29 +6,28 @@ import logging
 import math
 import random
 import time
-import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-import orjson
 
 from ..models.contracts import (
-    CompressionSummary,
     ConnectionSummary,
     EvalCase,
     ExperimentRecord,
-    HeroMetrics,
     LlmConfig,
-    PersonaViewModel,
     RunSnapshot,
-    RunStage,
     SearchProfile,
     SearchProfileChange,
 )
 from ..models.runtime import ConnectionContext, RunContext
 from ..models.report import ReportPayload
 from ..committee.evaluator import CommitteeEvaluator
-from ..committee.models import CommitteeSnapshot, CommitteePersonaView, RewriteAttempt, ScoreTimelinePoint
+from ..committee.models import (
+    CommitteeSnapshot,
+    CommitteePersonaView,
+    RewriteAttempt,
+    ScoreTimelinePoint,
+)
 from ..committee.reporting import build_export_payload, build_report
 from ..committee.rewrite_engine import BASE_PARAMETER_VALUES, CommitteeRewriteEngine
 from ..committee.runtime import CommitteeConnectionContext, CommitteeRunContext
@@ -36,6 +35,7 @@ from ..config import settings
 from ..engine.optimizer_search_space import generate_security_field_mutations
 from .persistence_service import PersistenceService
 from .report_service import ReportService
+from .task_runner import SearchTaskRunner
 
 logger = logging.getLogger(__name__)
 
@@ -50,12 +50,15 @@ class RunManager:
         self.committee_runs: Dict[str, CommitteeRunContext] = {}
         self.subscribers: Dict[str, Set[asyncio.Queue]] = {}
         self.persistence = persistence
+        self.search_task_runner = SearchTaskRunner(self)
 
     # ------------------------------------------------------------------
     # Connection management
     # ------------------------------------------------------------------
 
-    async def create_connection(self, connection_id: str, ctx: ConnectionContext) -> None:
+    async def create_connection(
+        self, connection_id: str, ctx: ConnectionContext
+    ) -> None:
         self.connections[connection_id] = ctx
         if self.persistence:
             await self.persistence.save_connection(
@@ -68,7 +71,9 @@ class RunManager:
                     "summary": ctx.summary.model_dump(),
                     "eval_set": [case.model_dump() for case in ctx.eval_set],
                     "baseline_profile": ctx.baseline_profile.model_dump(),
-                    "llm_config": ctx.llm_config.model_dump() if ctx.llm_config else None,
+                    "llm_config": ctx.llm_config.model_dump()
+                    if ctx.llm_config
+                    else None,
                     "text_fields": ctx.text_fields,
                     "sample_docs": ctx.sample_docs,
                     "created_at": datetime.now(timezone.utc).isoformat(),
@@ -90,7 +95,9 @@ class RunManager:
             connection_id=payload["connection_id"],
             mode=payload["mode"],
             summary=ConnectionSummary.model_validate(payload["summary"]),
-            eval_set=[EvalCase.model_validate(case) for case in payload.get("eval_set", [])],
+            eval_set=[
+                EvalCase.model_validate(case) for case in payload.get("eval_set", [])
+            ],
             baseline_profile=SearchProfile.model_validate(payload["baseline_profile"]),
             llm_config=LlmConfig.model_validate(payload["llm_config"])
             if payload.get("llm_config")
@@ -274,22 +281,24 @@ class RunManager:
         else:
             # Live mode: run full optimization pipeline
             optimizer_task = asyncio.create_task(
-                self._optimizer_loop(run_id),
+                self.search_task_runner.optimizer_loop(run_id),
                 name=f"optimizer-{run_id}",
             )
             persona_task = asyncio.create_task(
-                self._persona_simulator_loop(run_id),
+                self.search_task_runner.persona_simulator_loop(run_id),
                 name=f"personas-{run_id}",
             )
             compression_task = asyncio.create_task(
-                self._compression_benchmark(run_id),
+                self.search_task_runner.compression_benchmark(run_id),
                 name=f"compression-{run_id}",
             )
             metrics_task = asyncio.create_task(
-                self._metrics_heartbeat(run_id),
+                self.search_task_runner.metrics_heartbeat(run_id),
                 name=f"metrics-{run_id}",
             )
-            ctx.tasks.extend([optimizer_task, persona_task, compression_task, metrics_task])
+            ctx.tasks.extend(
+                [optimizer_task, persona_task, compression_task, metrics_task]
+            )
 
         # Persona positions remain stable; we no longer run a background orbit loop.
 
@@ -314,6 +323,8 @@ class RunManager:
     # ------------------------------------------------------------------
 
     async def _optimizer_loop(self, run_id: str) -> None:
+        await self.search_task_runner.optimizer_loop(run_id)
+        return
         """Main optimization loop for live mode."""
         ctx = self.runs.get(run_id)
         if not ctx:
@@ -323,7 +334,9 @@ class RunManager:
         from .llm_service import LLMService
         from ..config import settings as cfg
 
-        now_ts = lambda: datetime.now(timezone.utc).isoformat()
+        def now_ts() -> str:
+            return datetime.now(timezone.utc).isoformat()
+
         ctx.stage = "running"
         ctx.started_at = now_ts()
         start_time = time.monotonic()
@@ -346,7 +359,11 @@ class RunManager:
         try:
             # Evaluate baseline
             try:
-                baseline_score, baseline_failures, baseline_per_query = await self.evaluate_detailed(
+                (
+                    baseline_score,
+                    baseline_failures,
+                    baseline_per_query,
+                ) = await self.evaluate_detailed(
                     ctx,
                     ctx.baseline_profile,
                     es_svc=es_svc,
@@ -354,8 +371,18 @@ class RunManager:
                 ctx.metrics.baselineScore = baseline_score
                 ctx.metrics.currentScore = baseline_score
                 ctx.metrics.bestScore = baseline_score
-                ctx._best_score = baseline_score
+                ctx.best_score = baseline_score
                 ctx._current_query_failures = baseline_failures
+                # Continuation: carry forward the original baseline and cumulative counters
+                if ctx.original_baseline_score is not None:
+                    ctx.metrics.originalBaselineScore = ctx.original_baseline_score
+                    ctx.metrics.priorExperimentsRun = ctx.prior_experiments_run
+                    ctx.metrics.priorImprovementsKept = ctx.prior_improvements_kept
+                    # Show improvement relative to the ORIGINAL baseline, not continued
+                    orig = ctx.original_baseline_score
+                    ctx.metrics.improvementPct = (
+                        (baseline_score - orig) / max(orig, 0.001)
+                    ) * 100
                 # Track per-query baseline scores
                 for qid, qscore in baseline_per_query.items():
                     ctx.per_query_scores[qid] = {"baseline": qscore, "best": qscore}
@@ -393,9 +420,7 @@ class RunManager:
                     break
 
                 try:
-                    change = await self._pick_next_experiment(
-                        ctx, llm_svc, exp_num
-                    )
+                    change = await self._pick_next_experiment(ctx, llm_svc, exp_num)
                     if not change:
                         await asyncio.sleep(2.0)
                         continue
@@ -404,7 +429,11 @@ class RunManager:
                     _apply_profile_change(candidate, change)
 
                     t_start = time.monotonic()
-                    candidate_score, candidate_failures, candidate_per_query = await self.evaluate_detailed(
+                    (
+                        candidate_score,
+                        candidate_failures,
+                        candidate_per_query,
+                    ) = await self.evaluate_detailed(
                         ctx,
                         candidate,
                         es_svc=es_svc,
@@ -412,7 +441,7 @@ class RunManager:
                     duration_ms = int((time.monotonic() - t_start) * 1000)
 
                     baseline_for_exp = ctx.metrics.currentScore
-                    query_failures_before = list(getattr(ctx, "_current_query_failures", []))
+                    query_failures_before = list(ctx._current_query_failures)
                     delta_abs = candidate_score - baseline_for_exp
                     delta_pct = (delta_abs / max(baseline_for_exp, 0.001)) * 100
 
@@ -421,8 +450,8 @@ class RunManager:
                         decision = "kept"
                         ctx.current_profile = candidate
                         ctx._current_query_failures = candidate_failures
-                        if candidate_score > ctx._best_score:
-                            ctx._best_score = candidate_score
+                        if candidate_score > ctx.best_score:
+                            ctx.best_score = candidate_score
                             ctx.best_profile = candidate.model_copy(deep=True)
                             # Update per-query best scores
                             for qid, qscore in candidate_per_query.items():
@@ -432,7 +461,10 @@ class RunManager:
                                         qscore,
                                     )
                                 else:
-                                    ctx.per_query_scores[qid] = {"baseline": qscore, "best": qscore}
+                                    ctx.per_query_scores[qid] = {
+                                        "baseline": qscore,
+                                        "best": qscore,
+                                    }
                         plateau_count = 0
                     else:
                         decision = "reverted"
@@ -458,27 +490,39 @@ class RunManager:
                     ctx.metrics.currentScore = (
                         candidate_score if decision == "kept" else baseline_for_exp
                     )
-                    ctx.metrics.bestScore = ctx._best_score
+                    ctx.metrics.bestScore = ctx.best_score
+                    # Use original baseline (if continuing) for cumulative improvement
+                    ref_baseline = (
+                        ctx.metrics.originalBaselineScore
+                        if ctx.metrics.originalBaselineScore is not None
+                        else ctx.metrics.baselineScore
+                    )
                     ctx.metrics.improvementPct = (
-                        (ctx._best_score - ctx.metrics.baselineScore)
-                        / max(ctx.metrics.baselineScore, 0.001)
+                        (ctx.best_score - ref_baseline) / max(ref_baseline, 0.001)
                     ) * 100
                     ctx.metrics.elapsedSeconds = time.monotonic() - start_time
                     if decision == "kept":
                         ctx.metrics.improvementsKept += 1
                     ctx.metrics.scoreTimeline.append(
-                        {"t": ctx.metrics.elapsedSeconds, "score": ctx.metrics.currentScore}
+                        {
+                            "t": ctx.metrics.elapsedSeconds,
+                            "score": ctx.metrics.currentScore,
+                        }
                     )
 
                     await self.publish(
                         run_id,
-                        {"type": "experiment.completed", "payload": record.model_dump()},
+                        {
+                            "type": "experiment.completed",
+                            "payload": record.model_dump(),
+                        },
                     )
                     await self.publish(
                         run_id,
                         {"type": "metrics.tick", "payload": ctx.metrics.model_dump()},
                     )
-                    await self._persist_search_run(run_id)
+                    if (exp_num + 1) % 10 == 0 or exp_num == ctx.max_experiments - 1:
+                        await self._persist_search_run(run_id)
 
                     # Pace experiments so the visualization can animate.
                     # Local ES queries finish in <10ms; without pacing the entire
@@ -493,21 +537,32 @@ class RunManager:
                     await asyncio.sleep(1.0)
 
             try:
-                final_best_score, final_failures, final_per_query = await self.evaluate_detailed(
+                (
+                    final_best_score,
+                    final_failures,
+                    final_per_query,
+                ) = await self.evaluate_detailed(
                     ctx,
                     ctx.best_profile,
                     es_svc=es_svc,
                 )
-                ctx._best_score = final_best_score
+                ctx.best_score = final_best_score
                 ctx.metrics.bestScore = final_best_score
                 ctx.metrics.currentScore = final_best_score
+                ref_baseline_final = (
+                    ctx.metrics.originalBaselineScore
+                    if ctx.metrics.originalBaselineScore is not None
+                    else ctx.metrics.baselineScore
+                )
                 ctx.metrics.improvementPct = (
-                    (final_best_score - ctx.metrics.baselineScore)
-                    / max(ctx.metrics.baselineScore, 0.001)
+                    (final_best_score - ref_baseline_final)
+                    / max(ref_baseline_final, 0.001)
                 ) * 100
                 ctx._current_query_failures = final_failures
                 for qid, qscore in final_per_query.items():
-                    baseline_score = ctx.per_query_scores.get(qid, {}).get("baseline", qscore)
+                    baseline_score = ctx.per_query_scores.get(qid, {}).get(
+                        "baseline", qscore
+                    )
                     ctx.per_query_scores[qid] = {
                         "baseline": baseline_score,
                         "best": qscore,
@@ -524,7 +579,9 @@ class RunManager:
                         "best": previews,
                     }
             except Exception as exc:
-                logger.warning("Final best-profile evaluation failed for run %s: %s", run_id, exc)
+                logger.warning(
+                    "Final best-profile evaluation failed for run %s: %s", run_id, exc
+                )
                 ctx.warnings.append(f"Final best-profile evaluation failed: {exc}")
         finally:
             if es_svc:
@@ -549,51 +606,11 @@ class RunManager:
         es_svc: Optional[Any] = None,
     ) -> Tuple[float, List[str], Dict[str, float]]:
         """Evaluate a search profile against the eval set, returning (nDCG@10, missed queries, per-query scores)."""
-        if not ctx.eval_set:
-            return 0.5, [], {}
-
-        from .es_service import ESService
-
-        close_after = False
-        if es_svc is None:
-            if not ctx.es_url or not ctx.index_name:
-                return 0.0, [case.query for case in ctx.eval_set], {}
-            es_svc = ESService(es_url=ctx.es_url, api_key=ctx.api_key or None)
-            close_after = True
-
-        total_ndcg = 0.0
-        evaluated = 0
-        missed_queries: List[str] = []
-        per_query_scores: Dict[str, float] = {}
-
-        try:
-            for case in ctx.eval_set:
-                if not case.relevantDocIds:
-                    continue
-
-                try:
-                    ranked_doc_ids = await es_svc.execute_profile_query(
-                        index=ctx.index_name or ctx.summary.indexName,
-                        query_text=case.query,
-                        profile=profile,
-                        size=10,
-                    )
-                except Exception as exc:
-                    logger.warning("Query evaluation failed for '%s': %s", case.query, exc)
-                    ranked_doc_ids = []
-
-                ndcg = self._compute_ndcg_at_k(case.relevantDocIds, ranked_doc_ids, k=10)
-                total_ndcg += ndcg
-                evaluated += 1
-                per_query_scores[case.id] = ndcg
-                if ndcg == 0:
-                    missed_queries.append(case.query)
-        finally:
-            if close_after:
-                await es_svc.close()
-
-        mean_score = total_ndcg / max(evaluated, 1)
-        return mean_score, missed_queries, per_query_scores
+        return await self.search_task_runner.evaluate_profile(
+            ctx,
+            profile,
+            es_svc=es_svc,
+        )
 
     async def evaluate_detailed(
         self,
@@ -601,7 +618,11 @@ class RunManager:
         profile: SearchProfile,
         es_svc: Optional[Any] = None,
     ) -> Tuple[float, List[str], Dict[str, float]]:
-        return await self._evaluate_profile(ctx, profile, es_svc=es_svc)
+        return await self.search_task_runner.evaluate_detailed(
+            ctx,
+            profile,
+            es_svc=es_svc,
+        )
 
     async def _collect_query_result_previews(
         self,
@@ -609,6 +630,11 @@ class RunManager:
         profile: SearchProfile,
         es_svc: Optional[Any] = None,
     ) -> Dict[str, List[Dict[str, Any]]]:
+        return await self.search_task_runner.collect_query_result_previews(
+            ctx,
+            profile,
+            es_svc=es_svc,
+        )
         if not ctx.eval_set:
             return {}
 
@@ -632,7 +658,9 @@ class RunManager:
                         size=5,
                     )
                 except Exception as exc:
-                    logger.warning("Preview collection failed for '%s': %s", case.query, exc)
+                    logger.warning(
+                        "Preview collection failed for '%s': %s", case.query, exc
+                    )
                     previews[case.id] = []
         finally:
             if close_after:
@@ -646,6 +674,11 @@ class RunManager:
         llm_svc: Optional[Any],
         exp_num: int,
     ) -> Optional[SearchProfileChange]:
+        return await self.search_task_runner._pick_next_experiment(
+            ctx,
+            llm_svc,
+            exp_num,
+        )
         """Choose the next experiment to run."""
         # Try LLM-guided suggestion first
         if llm_svc and llm_svc.available and exp_num % 3 == 0:
@@ -671,13 +704,14 @@ class RunManager:
         return _heuristic_next_experiment(ctx.current_profile, combined_history)
 
     async def _persona_simulator_loop(self, run_id: str) -> None:
+        await self.search_task_runner.persona_simulator_loop(run_id)
+        return
         """Simulate persona search activity for live mode."""
         ctx = self.runs.get(run_id)
         if not ctx:
             return
 
         rng = random.Random(42)
-        now_ts = lambda: datetime.now(timezone.utc).isoformat()
 
         while not ctx.cancel_flag.is_set() and ctx.stage in ("running", "starting"):
             try:
@@ -714,7 +748,9 @@ class RunManager:
                         persona.lastResultRank = None
 
                     total = persona.totalSearches
-                    persona.successRate = (persona.successes + persona.partials * 0.5) / max(total, 1)
+                    persona.successRate = (
+                        persona.successes + persona.partials * 0.5
+                    ) / max(total, 1)
 
                 # Update aggregate persona success rate
                 if ctx.personas:
@@ -728,7 +764,7 @@ class RunManager:
                         "type": "persona.batch",
                         "payload": {
                             "runId": run_id,
-                            "personas": [p.model_dump() for p in ctx.personas],
+                            "personas": [p.model_dump() for p in selected],
                         },
                     },
                 )
@@ -741,45 +777,9 @@ class RunManager:
                 logger.error("Persona simulator error: %s", exc)
                 await asyncio.sleep(2.0)
 
-    async def _persona_animation_loop(self, run_id: str) -> None:
-        """Update persona orbital positions for the frontend animation."""
-        ctx = self.runs.get(run_id)
-        if not ctx:
-            return
-
-        now_ts = lambda: datetime.now(timezone.utc).isoformat()
-        tick = 0
-
-        while not ctx.cancel_flag.is_set() and ctx.stage not in ("completed", "error"):
-            try:
-                for p in ctx.personas:
-                    p.angle = (p.angle + p.speed) % (2 * math.pi)
-
-                # Publish persona positions every 5 ticks (~2.5s at 500ms interval)
-                if tick % 5 == 0 and ctx.stage == "running":
-                    await self.publish(
-                        run_id,
-                        {
-                            "type": "persona_positions",
-                            "runId": run_id,
-                            "positions": [
-                                {"id": p.id, "angle": p.angle, "radius": p.radius}
-                                for p in ctx.personas
-                            ],
-                            "ts": now_ts(),
-                        },
-                    )
-
-                tick += 1
-                await asyncio.sleep(0.5)
-
-            except asyncio.CancelledError:
-                break
-            except Exception as exc:
-                logger.error("Persona animation error: %s", exc)
-                await asyncio.sleep(1.0)
-
     async def _compression_benchmark(self, run_id: str) -> None:
+        await self.search_task_runner.compression_benchmark(run_id)
+        return
         """Simulate compression benchmarking for live mode."""
         ctx = self.runs.get(run_id)
         if not ctx:
@@ -789,7 +789,6 @@ class RunManager:
             ctx.compression.status = "skipped"
             return
 
-        now_ts = lambda: datetime.now(timezone.utc).isoformat()
         ctx.compression.available = True
         ctx.compression.vectorField = ctx.summary.vectorField
         ctx.compression.vectorDims = ctx.summary.vectorDims
@@ -814,7 +813,7 @@ class RunManager:
         dims = ctx.summary.vectorDims or 768
         doc_count = ctx.summary.docCount
         float32_size = dims * 4 * doc_count
-        cost_per_byte_month = settings.cost_per_gb_per_month / (1024 ** 3)
+        cost_per_byte_month = settings.cost_per_gb_per_month / (1024**3)
 
         results = []
         for method_name, size_ratio, recall in methods:
@@ -854,7 +853,9 @@ class RunManager:
             if int8_result:
                 savings = float32_cost - int8_result.estimatedMonthlyCostUsd
                 ctx.compression.projectedMonthlySavingsUsd = round(max(savings, 0), 2)
-                ctx.metrics.projectedMonthlySavingsUsd = ctx.compression.projectedMonthlySavingsUsd
+                ctx.metrics.projectedMonthlySavingsUsd = (
+                    ctx.compression.projectedMonthlySavingsUsd
+                )
 
         await self.publish(
             run_id,
@@ -866,12 +867,13 @@ class RunManager:
         await self._persist_search_run(run_id)
 
     async def _metrics_heartbeat(self, run_id: str) -> None:
+        await self.search_task_runner.metrics_heartbeat(run_id)
+        return
         """Periodically publish metrics updates."""
         ctx = self.runs.get(run_id)
         if not ctx:
             return
 
-        now_ts = lambda: datetime.now(timezone.utc).isoformat()
         start_time = time.monotonic()
 
         while not ctx.cancel_flag.is_set() and ctx.stage in ("running", "starting"):
@@ -908,8 +910,12 @@ class RunManager:
             warnings=ctx.warnings,
             thresholds=ctx.score_thresholds,
         )
-        rewrite_engine = CommitteeRewriteEngine(ctx.profile, llm_svc, warnings=ctx.warnings)
-        now_ts = lambda: datetime.now(timezone.utc).isoformat()
+        rewrite_engine = CommitteeRewriteEngine(
+            ctx.profile, llm_svc, warnings=ctx.warnings
+        )
+
+        def now_ts() -> str:
+            return datetime.now(timezone.utc).isoformat()
 
         ctx.stage = "running"
         ctx.started_at = now_ts()
@@ -933,12 +939,16 @@ class RunManager:
                 evaluations=ctx.section_evaluations,
                 latest_section_id=None,
             )
-            baseline_score = evaluator.consensus_score(ctx.personas, ctx.evaluation_mode)
+            baseline_score = evaluator.consensus_score(
+                ctx.personas, ctx.evaluation_mode
+            )
             ctx.metrics.baselineScore = baseline_score
             ctx.metrics.currentScore = baseline_score
             ctx.metrics.bestScore = baseline_score
-            ctx.metrics.scoreTimeline = [ScoreTimelinePoint(t=0.0, score=baseline_score)]
-            ctx._best_score = baseline_score
+            ctx.metrics.scoreTimeline = [
+                ScoreTimelinePoint(t=0.0, score=baseline_score)
+            ]
+            ctx.best_score = baseline_score
             _update_evaluation_metrics(ctx)
         except Exception as exc:
             logger.error("Committee baseline evaluation failed: %s", exc)
@@ -947,13 +957,16 @@ class RunManager:
             ctx.metrics.currentScore = 0.35
             ctx.metrics.bestScore = 0.35
             ctx.metrics.scoreTimeline = [ScoreTimelinePoint(t=0.0, score=0.35)]
-            ctx._best_score = 0.35
+            ctx.best_score = 0.35
 
         await self.publish(
             run_id,
             {
                 "type": "committee.persona.batch",
-                "payload": {"runId": run_id, "personas": [persona.model_dump() for persona in ctx.personas]},
+                "payload": {
+                    "runId": run_id,
+                    "personas": [persona.model_dump() for persona in ctx.personas],
+                },
             },
         )
         await self.publish(
@@ -994,7 +1007,9 @@ class RunManager:
                 before_text = section.content
 
                 candidate_sections = list(ctx.document.sections)
-                updated_section = section.model_copy(update={"content": proposal.rewritten_text})
+                updated_section = section.model_copy(
+                    update={"content": proposal.rewritten_text}
+                )
                 candidate_sections = [
                     updated_section if item.id == section.id else item
                     for item in candidate_sections
@@ -1003,7 +1018,9 @@ class RunManager:
                 eval_start = time.monotonic()
                 candidate_evaluations = dict(ctx.section_evaluations)
                 for persona in ctx.persona_definitions:
-                    candidate_evaluations[(section.id, persona.id)] = await evaluator.evaluate_section(
+                    candidate_evaluations[
+                        (section.id, persona.id)
+                    ] = await evaluator.evaluate_section(
                         persona,
                         updated_section,
                     )
@@ -1015,12 +1032,18 @@ class RunManager:
                     evaluations=candidate_evaluations,
                     latest_section_id=section.id,
                 )
-                candidate_score = evaluator.consensus_score(candidate_personas, ctx.evaluation_mode)
+                candidate_score = evaluator.consensus_score(
+                    candidate_personas, ctx.evaluation_mode
+                )
                 duration_ms = int((time.monotonic() - eval_start) * 1000)
 
                 current_persona_map = {persona.id: persona for persona in ctx.personas}
                 persona_deltas = {
-                    candidate.id: round(candidate.currentScore - current_persona_map[candidate.id].currentScore, 4)
+                    candidate.id: round(
+                        candidate.currentScore
+                        - current_persona_map[candidate.id].currentScore,
+                        4,
+                    )
                     for candidate in candidate_personas
                     if candidate.id in current_persona_map
                 }
@@ -1035,17 +1058,21 @@ class RunManager:
                         candidate_evaluations=candidate_evaluations,
                         candidate_personas=candidate_personas,
                     )
-                    parameter_state.setdefault(section.id, {})[proposal.parameter_name] = proposal.new_value
-                    if candidate_score >= ctx._best_score:
-                        ctx._best_score = candidate_score
+                    parameter_state.setdefault(section.id, {})[
+                        proposal.parameter_name
+                    ] = proposal.new_value
+                    if candidate_score >= ctx.best_score:
+                        ctx.best_score = candidate_score
                         ctx.best_document = ctx.document.model_copy(deep=True)
                 else:
                     decision = "reverted"
 
                 delta_abs = candidate_score - baseline_for_exp
                 delta_pct = (delta_abs / max(baseline_for_exp, 0.001)) * 100
-                parameter_history.setdefault(proposal.parameter_name, deque(maxlen=6)).append(delta_abs)
-                plateau_window.append((ctx._best_score, proposal.parameter_name))
+                parameter_history.setdefault(
+                    proposal.parameter_name, deque(maxlen=6)
+                ).append(delta_abs)
+                plateau_window.append((ctx.best_score, proposal.parameter_name))
                 record = RewriteAttempt(
                     experimentId=exp_num + 1,
                     timestamp=now_ts(),
@@ -1070,8 +1097,10 @@ class RunManager:
                 ctx.rewrites.append(record)
 
                 ctx.metrics.rewritesTested = exp_num + 1
-                ctx.metrics.currentScore = candidate_score if decision == "kept" else baseline_for_exp
-                ctx.metrics.bestScore = ctx._best_score
+                ctx.metrics.currentScore = (
+                    candidate_score if decision == "kept" else baseline_for_exp
+                )
+                ctx.metrics.bestScore = ctx.best_score
                 if decision == "kept":
                     ctx.metrics.acceptedRewrites += 1
                 ctx.metrics.elapsedSeconds = time.monotonic() - start_time
@@ -1079,11 +1108,17 @@ class RunManager:
                 ctx.metrics.currentSectionTitle = section.title
                 if ctx.metrics.baselineScore > 0:
                     ctx.metrics.improvementPct = round(
-                        ((ctx._best_score - ctx.metrics.baselineScore) / ctx.metrics.baselineScore) * 100,
+                        (
+                            (ctx.best_score - ctx.metrics.baselineScore)
+                            / ctx.metrics.baselineScore
+                        )
+                        * 100,
                         2,
                     )
                 ctx.metrics.scoreTimeline.append(
-                    ScoreTimelinePoint(t=ctx.metrics.elapsedSeconds, score=ctx.metrics.currentScore)
+                    ScoreTimelinePoint(
+                        t=ctx.metrics.elapsedSeconds, score=ctx.metrics.currentScore
+                    )
                 )
                 _update_evaluation_metrics(ctx)
 
@@ -1097,7 +1132,9 @@ class RunManager:
                         "type": "committee.persona.batch",
                         "payload": {
                             "runId": run_id,
-                            "personas": [persona.model_dump() for persona in ctx.personas],
+                            "personas": [
+                                persona.model_dump() for persona in ctx.personas
+                            ],
                         },
                     },
                 )
@@ -1107,14 +1144,18 @@ class RunManager:
                 )
 
                 min_iteration_seconds = 0.85
-                remaining = min_iteration_seconds - (time.monotonic() - iteration_started)
+                remaining = min_iteration_seconds - (
+                    time.monotonic() - iteration_started
+                )
                 if remaining > 0 and not ctx.cancel_flag.is_set():
                     await asyncio.sleep(remaining)
 
             except asyncio.CancelledError:
                 break
             except Exception as exc:
-                logger.error("Committee optimizer error at rewrite %d: %s", exp_num, exc)
+                logger.error(
+                    "Committee optimizer error at rewrite %d: %s", exp_num, exc
+                )
                 await asyncio.sleep(1.0)
 
         if ctx.started_monotonic is not None:
@@ -1143,8 +1184,14 @@ class RunManager:
 
         while not ctx.cancel_flag.is_set():
             try:
-                if ctx.started_monotonic is not None and ctx.stage in ("running", "starting", "stopping"):
-                    ctx.metrics.elapsedSeconds = time.monotonic() - ctx.started_monotonic
+                if ctx.started_monotonic is not None and ctx.stage in (
+                    "running",
+                    "starting",
+                    "stopping",
+                ):
+                    ctx.metrics.elapsedSeconds = (
+                        time.monotonic() - ctx.started_monotonic
+                    )
                     await self.publish(
                         run_id,
                         {"type": "metrics.tick", "payload": ctx.metrics.model_dump()},
@@ -1202,21 +1249,11 @@ class RunManager:
         ranked_doc_ids: List[str],
         k: int = 10,
     ) -> float:
-        relevant = [str(doc_id) for doc_id in relevant_doc_ids if str(doc_id)]
-        if not relevant:
-            return 0.0
-
-        relevant_set = set(relevant)
-        dcg = 0.0
-        for rank, doc_id in enumerate(ranked_doc_ids[:k], start=1):
-            if str(doc_id) in relevant_set:
-                dcg += 1.0 / math.log2(rank + 1)
-
-        ideal_count = min(len(relevant_set), k)
-        ideal_dcg = sum(1.0 / math.log2(rank + 1) for rank in range(1, ideal_count + 1))
-        if ideal_dcg == 0:
-            return 0.0
-        return dcg / ideal_dcg
+        return self.search_task_runner._compute_ndcg_at_k(
+            relevant_doc_ids,
+            ranked_doc_ids,
+            k=k,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -1245,11 +1282,15 @@ def _build_committee_persona_views(
 def _update_evaluation_metrics(ctx: CommitteeRunContext) -> None:
     evaluations = list(ctx.section_evaluations.values())
     ai_evaluations = sum(1 for evaluation in evaluations if evaluation.source == "llm")
-    heuristic_evaluations = sum(1 for evaluation in evaluations if evaluation.source == "heuristic")
+    heuristic_evaluations = sum(
+        1 for evaluation in evaluations if evaluation.source == "heuristic"
+    )
     total = ai_evaluations + heuristic_evaluations
     ctx.metrics.aiEvaluations = ai_evaluations
     ctx.metrics.heuristicEvaluations = heuristic_evaluations
-    ctx.metrics.llmCoveragePct = round((ai_evaluations / total) * 100, 1) if total else 0.0
+    ctx.metrics.llmCoveragePct = (
+        round((ai_evaluations / total) * 100, 1) if total else 0.0
+    )
 
 
 def _commit_committee_candidate(
@@ -1295,7 +1336,9 @@ def _select_committee_section(ctx: CommitteeRunContext, rng: random.Random) -> A
     return ctx.document.sections[-1]
 
 
-def _select_committee_parameter(parameter_history: Dict[str, deque[float]], rng: random.Random) -> str:
+def _select_committee_parameter(
+    parameter_history: Dict[str, deque[float]], rng: random.Random
+) -> str:
     weighted_parameters = []
     for name, history in parameter_history.items():
         if not history:
@@ -1303,7 +1346,9 @@ def _select_committee_parameter(parameter_history: Dict[str, deque[float]], rng:
         else:
             average_delta = sum(history) / len(history)
             positive_hits = sum(1 for delta in history if delta > 0)
-            recent_negative_streak = len(history) >= 3 and all(delta <= 0 for delta in list(history)[-3:])
+            recent_negative_streak = len(history) >= 3 and all(
+                delta <= 0 for delta in list(history)[-3:]
+            )
             weight = 1.0 + max(average_delta, 0.0) * 24 + positive_hits * 0.45
             if recent_negative_streak:
                 weight *= 0.55
@@ -1326,22 +1371,27 @@ def _committee_plateau_reached(window: deque[tuple[float, str]]) -> bool:
     parameters = {item[1] for item in window}
     return (max(scores) - min(scores)) < 0.003 and len(parameters) >= 3
 
+
 def _apply_profile_change(profile: SearchProfile, change: SearchProfileChange) -> None:
     """Apply a SearchProfileChange to a SearchProfile in-place."""
     import re as _re
+
     try:
         # Handle field boost paths like "lexicalFields[0].boost"
         m = _re.match(r"lexicalFields\[(\d+)\]\.boost", change.path)
         if m:
             idx = int(m.group(1))
             if idx < len(profile.lexicalFields):
-                profile.lexicalFields[idx] = dict(profile.lexicalFields[idx])
-                profile.lexicalFields[idx]["boost"] = change.after
+                profile.lexicalFields[idx] = profile.lexicalFields[idx].model_copy(
+                    update={"boost": change.after}
+                )
             return
         if hasattr(profile, change.path):
             setattr(profile, change.path, change.after)
     except Exception as exc:
-        logger.warning("Failed to apply change %s=%r: %s", change.path, change.after, exc)
+        logger.warning(
+            "Failed to apply change %s=%r: %s", change.path, change.after, exc
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -1349,8 +1399,14 @@ def _apply_profile_change(profile: SearchProfile, change: SearchProfileChange) -
 # ---------------------------------------------------------------------------
 
 _GRID_LEXICAL: List[Dict[str, Any]] = [
-    {"path": "multiMatchType", "values": ["best_fields", "most_fields", "cross_fields", "phrase"]},
-    {"path": "minimumShouldMatch", "values": ["50%", "60%", "70%", "75%", "80%", "85%", "90%", "100%"]},
+    {
+        "path": "multiMatchType",
+        "values": ["best_fields", "most_fields", "cross_fields", "phrase"],
+    },
+    {
+        "path": "minimumShouldMatch",
+        "values": ["50%", "60%", "70%", "75%", "80%", "85%", "90%", "100%"],
+    },
     {"path": "tieBreaker", "values": [0.0, 0.1, 0.2, 0.3, 0.4, 0.5]},
     {"path": "phraseBoost", "values": [0.0, 0.5, 1.0, 1.5, 2.0, 3.0]},
     {"path": "fuzziness", "values": ["0", "AUTO"]},
@@ -1380,22 +1436,64 @@ _BOOST_VALUES = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0]
 # Continuous ranges for random perturbation (phase 2+)
 _CONTINUOUS_PARAMS: List[Dict[str, Any]] = [
     {"path": "tieBreaker", "min": 0.0, "max": 0.7, "round": 2, "label": "Tie breaker"},
-    {"path": "phraseBoost", "min": 0.0, "max": 5.0, "round": 1, "label": "Phrase boost"},
+    {
+        "path": "phraseBoost",
+        "min": 0.0,
+        "max": 5.0,
+        "round": 1,
+        "label": "Phrase boost",
+    },
 ]
 
 _DISCRETE_PARAMS: List[Dict[str, Any]] = [
-    {"path": "multiMatchType", "values": ["best_fields", "most_fields", "cross_fields", "phrase"], "label": "Multi-match type"},
-    {"path": "minimumShouldMatch", "values": ["50%", "55%", "60%", "65%", "70%", "75%", "80%", "85%", "90%", "95%", "100%"], "label": "Minimum should match"},
+    {
+        "path": "multiMatchType",
+        "values": ["best_fields", "most_fields", "cross_fields", "phrase"],
+        "label": "Multi-match type",
+    },
+    {
+        "path": "minimumShouldMatch",
+        "values": [
+            "50%",
+            "55%",
+            "60%",
+            "65%",
+            "70%",
+            "75%",
+            "80%",
+            "85%",
+            "90%",
+            "95%",
+            "100%",
+        ],
+        "label": "Minimum should match",
+    },
     {"path": "fuzziness", "values": ["0", "AUTO"], "label": "Fuzziness"},
 ]
 
 _VECTOR_CONTINUOUS: List[Dict[str, Any]] = [
-    {"path": "vectorWeight", "min": 0.1, "max": 0.8, "round": 2, "label": "Vector weight"},
+    {
+        "path": "vectorWeight",
+        "min": 0.1,
+        "max": 0.8,
+        "round": 2,
+        "label": "Vector weight",
+    },
 ]
 
 _VECTOR_DISCRETE: List[Dict[str, Any]] = [
-    {"path": "fusionMethod", "values": ["weighted_sum", "rrf"], "label": "Fusion method"},
-    {"path": "rrfRankConstant", "min": 10, "max": 120, "step": 10, "label": "RRF rank constant"},
+    {
+        "path": "fusionMethod",
+        "values": ["weighted_sum", "rrf"],
+        "label": "Fusion method",
+    },
+    {
+        "path": "rrfRankConstant",
+        "min": 10,
+        "max": 120,
+        "step": 10,
+        "label": "RRF rank constant",
+    },
     {"path": "knnK", "min": 5, "max": 80, "step": 5, "label": "KNN k"},
 ]
 
@@ -1452,12 +1550,14 @@ def _grid_sweep(
 
     for i, field_entry in enumerate(profile.lexicalFields):
         boost_path = f"lexicalFields[{i}].boost"
-        space.append({
-            "path": boost_path,
-            "values": _BOOST_VALUES,
-            "_field_index": i,
-            "_field_name": field_entry.get("field", f"field_{i}"),
-        })
+        space.append(
+            {
+                "path": boost_path,
+                "values": _BOOST_VALUES,
+                "_field_index": i,
+                "_field_name": field_entry.get("field", f"field_{i}"),
+            }
+        )
 
     rng.shuffle(space)
 
@@ -1472,7 +1572,9 @@ def _grid_sweep(
             for val in item["values"]:
                 if str(val) not in tried_vals and val != current_val:
                     return SearchProfileChange(
-                        path=path, before=current_val, after=val,
+                        path=path,
+                        before=current_val,
+                        after=val,
                         label=f"{field_name} boost {current_val} → {val}",
                     )
         else:
@@ -1480,7 +1582,9 @@ def _grid_sweep(
             for val in item["values"]:
                 if str(val) not in tried_vals and val != current_val:
                     return SearchProfileChange(
-                        path=path, before=current_val, after=val,
+                        path=path,
+                        before=current_val,
+                        after=val,
                         label=f"{_FIELD_LABELS.get(path, path)} {current_val!r} → {val!r}",
                     )
     return None
@@ -1527,24 +1631,28 @@ def _single_random_mutation(
         delta = rng.choice([-2.0, -1.0, -0.5, -0.25, 0.25, 0.5, 1.0, 2.0])
         new_val = round(max(0.1, min(10.0, current + delta)), 2)
         if new_val != current:
-            candidates.append(SearchProfileChange(
-                path=f"lexicalFields[{i}].boost",
-                before=current,
-                after=new_val,
-                label=f"{field_entry.get('field', f'field_{i}')} boost {current} → {new_val}",
-            ))
+            candidates.append(
+                SearchProfileChange(
+                    path=f"lexicalFields[{i}].boost",
+                    before=current,
+                    after=new_val,
+                    label=f"{field_entry.get('field', f'field_{i}')} boost {current} → {new_val}",
+                )
+            )
 
     # Continuous params
     for param in _CONTINUOUS_PARAMS:
         current = getattr(profile, param["path"], 0.0)
         new_val = round(rng.uniform(param["min"], param["max"]), param["round"])
         if new_val != current:
-            candidates.append(SearchProfileChange(
-                path=param["path"],
-                before=current,
-                after=new_val,
-                label=f"{param['label']} {current} → {new_val}",
-            ))
+            candidates.append(
+                SearchProfileChange(
+                    path=param["path"],
+                    before=current,
+                    after=new_val,
+                    label=f"{param['label']} {current} → {new_val}",
+                )
+            )
 
     # Discrete params
     for param in _DISCRETE_PARAMS:
@@ -1552,12 +1660,14 @@ def _single_random_mutation(
         other_vals = [v for v in param["values"] if v != current]
         if other_vals:
             new_val = rng.choice(other_vals)
-            candidates.append(SearchProfileChange(
-                path=param["path"],
-                before=current,
-                after=new_val,
-                label=f"{param['label']} {current!r} → {new_val!r}",
-            ))
+            candidates.append(
+                SearchProfileChange(
+                    path=param["path"],
+                    before=current,
+                    after=new_val,
+                    label=f"{param['label']} {current!r} → {new_val!r}",
+                )
+            )
 
     # Vector params (if enabled)
     if profile.useVector:
@@ -1565,24 +1675,28 @@ def _single_random_mutation(
             current = getattr(profile, param["path"], 0.35)
             new_val = round(rng.uniform(param["min"], param["max"]), param["round"])
             if new_val != current:
-                candidates.append(SearchProfileChange(
-                    path=param["path"],
-                    before=current,
-                    after=new_val,
-                    label=f"{param['label']} {current} → {new_val}",
-                ))
+                candidates.append(
+                    SearchProfileChange(
+                        path=param["path"],
+                        before=current,
+                        after=new_val,
+                        label=f"{param['label']} {current} → {new_val}",
+                    )
+                )
         for param in _VECTOR_DISCRETE:
             if "values" in param:
                 current = getattr(profile, param["path"], None)
                 other_vals = [v for v in param["values"] if v != current]
                 if other_vals:
                     new_val = rng.choice(other_vals)
-                    candidates.append(SearchProfileChange(
-                        path=param["path"],
-                        before=current,
-                        after=new_val,
-                        label=f"{param['label']} {current!r} → {new_val!r}",
-                    ))
+                    candidates.append(
+                        SearchProfileChange(
+                            path=param["path"],
+                            before=current,
+                            after=new_val,
+                            label=f"{param['label']} {current!r} → {new_val!r}",
+                        )
+                    )
             elif "min" in param:
                 current = getattr(profile, param["path"], param["min"])
                 step = param.get("step", 1)
@@ -1590,12 +1704,14 @@ def _single_random_mutation(
                 other_vals = [v for v in possible if v != current]
                 if other_vals:
                     new_val = rng.choice(other_vals)
-                    candidates.append(SearchProfileChange(
-                        path=param["path"],
-                        before=current,
-                        after=new_val,
-                        label=f"{param['label']} {current} → {new_val}",
-                    ))
+                    candidates.append(
+                        SearchProfileChange(
+                            path=param["path"],
+                            before=current,
+                            after=new_val,
+                            label=f"{param['label']} {current} → {new_val}",
+                        )
+                    )
 
     filtered_candidates = [
         candidate
@@ -1611,7 +1727,9 @@ def _single_random_mutation(
     current_fuzz = profile.fuzziness
     new_fuzz = "AUTO" if current_fuzz == "0" else "0"
     return SearchProfileChange(
-        path="fuzziness", before=current_fuzz, after=new_fuzz,
+        path="fuzziness",
+        before=current_fuzz,
+        after=new_fuzz,
         label=f"Fuzziness {current_fuzz!r} → {new_fuzz!r}",
     )
 
@@ -1633,41 +1751,67 @@ def _combo_mutation(
         # Try values far from current
         new_val = round(rng.uniform(0.1, 8.0), 1)
         if abs(new_val - current) > 0.5:
-            candidates.append(SearchProfileChange(
-                path=f"lexicalFields[{i}].boost",
-                before=current,
-                after=new_val,
-                label=f"{field_entry.get('field', f'field_{i}')} boost {current} → {new_val} (explore)",
-            ))
+            candidates.append(
+                SearchProfileChange(
+                    path=f"lexicalFields[{i}].boost",
+                    before=current,
+                    after=new_val,
+                    label=f"{field_entry.get('field', f'field_{i}')} boost {current} → {new_val} (explore)",
+                )
+            )
 
     # Wide tie_breaker sweep
     current_tb = profile.tieBreaker
     new_tb = round(rng.uniform(0.0, 0.8), 2)
     if new_tb != current_tb:
-        candidates.append(SearchProfileChange(
-            path="tieBreaker", before=current_tb, after=new_tb,
-            label=f"Tie breaker {current_tb} → {new_tb} (explore)",
-        ))
+        candidates.append(
+            SearchProfileChange(
+                path="tieBreaker",
+                before=current_tb,
+                after=new_tb,
+                label=f"Tie breaker {current_tb} → {new_tb} (explore)",
+            )
+        )
 
     # Wide phrase boost sweep
     current_pb = profile.phraseBoost
     new_pb = round(rng.uniform(0.0, 6.0), 1)
     if new_pb != current_pb:
-        candidates.append(SearchProfileChange(
-            path="phraseBoost", before=current_pb, after=new_pb,
-            label=f"Phrase boost {current_pb} → {new_pb} (explore)",
-        ))
+        candidates.append(
+            SearchProfileChange(
+                path="phraseBoost",
+                before=current_pb,
+                after=new_pb,
+                label=f"Phrase boost {current_pb} → {new_pb} (explore)",
+            )
+        )
 
     # Random minimumShouldMatch
-    all_msm = ["50%", "55%", "60%", "65%", "70%", "75%", "80%", "85%", "90%", "95%", "100%"]
+    all_msm = [
+        "50%",
+        "55%",
+        "60%",
+        "65%",
+        "70%",
+        "75%",
+        "80%",
+        "85%",
+        "90%",
+        "95%",
+        "100%",
+    ]
     current_msm = profile.minimumShouldMatch
     other_msm = [v for v in all_msm if v != current_msm]
     if other_msm:
         new_msm = rng.choice(other_msm)
-        candidates.append(SearchProfileChange(
-            path="minimumShouldMatch", before=current_msm, after=new_msm,
-            label=f"Minimum should match {current_msm!r} → {new_msm!r} (explore)",
-        ))
+        candidates.append(
+            SearchProfileChange(
+                path="minimumShouldMatch",
+                before=current_msm,
+                after=new_msm,
+                label=f"Minimum should match {current_msm!r} → {new_msm!r} (explore)",
+            )
+        )
 
     filtered_candidates = [
         candidate
@@ -1701,7 +1845,10 @@ def _hypothesis_text(change: SearchProfileChange) -> str:
             "phrase": "Favor ordered phrase matches when exact wording should matter most.",
             "best_fields": "Bias toward the single strongest field match to sharpen precision.",
         }
-        return descriptions.get(str(after), f"Change the multi-match strategy to {after} and measure the ranking tradeoff.")
+        return descriptions.get(
+            str(after),
+            f"Change the multi-match strategy to {after} and measure the ranking tradeoff.",
+        )
 
     if path == "minimumShouldMatch":
         try:
@@ -1711,7 +1858,9 @@ def _hypothesis_text(change: SearchProfileChange) -> str:
                 return "Tighten term matching so weaker partial matches fall away and exact intent carries more weight."
             return "Relax term matching so the engine can recover relevant documents that only match part of the query."
         except Exception:
-            return "Adjust term-matching strictness to rebalance recall versus precision."
+            return (
+                "Adjust term-matching strictness to rebalance recall versus precision."
+            )
 
     if path == "phraseBoost":
         if isinstance(before, (int, float)) and isinstance(after, (int, float)):
@@ -1728,7 +1877,11 @@ def _hypothesis_text(change: SearchProfileChange) -> str:
         return "Rebalance how much supporting field matches contribute once one field already matches strongly."
 
     if path == "vectorWeight":
-        if isinstance(before, (int, float)) and isinstance(after, (int, float)) and after > before:
+        if (
+            isinstance(before, (int, float))
+            and isinstance(after, (int, float))
+            and after > before
+        ):
             return "Lean harder on semantic similarity to catch concept matches beyond exact wording."
         return "Pull ranking back toward lexical evidence so exact field matches dominate over semantic recall."
 

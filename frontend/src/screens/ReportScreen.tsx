@@ -231,6 +231,9 @@ export default function ReportScreen() {
     if (!connectionConfig) {
       throw new Error('This saved report does not include enough connection details to reconnect automatically.');
     }
+    if (connectionConfig.hasApiKey && !connectionConfig.apiKey) {
+      throw new Error('This saved report came from a secured cluster. Reconnect from the landing page and re-enter the Elasticsearch API key.');
+    }
 
     const reconnectResp = await api.connect({
       mode: connectionConfig.mode,

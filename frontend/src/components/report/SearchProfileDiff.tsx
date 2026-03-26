@@ -171,6 +171,7 @@ export default function SearchProfileDiff({ before, after, diff }: SearchProfile
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
+            gap: 12,
             marginBottom: 10,
           }}
         >
@@ -181,6 +182,8 @@ export default function SearchProfileDiff({ before, after, diff }: SearchProfile
               fontSize: 13,
               color: '#9AA4B2',
               margin: 0,
+              minWidth: 0,
+              flexShrink: 1,
             }}
           >
             Recommended Profile (copy to use)
@@ -198,6 +201,8 @@ export default function SearchProfileDiff({ before, after, diff }: SearchProfile
               color: copied ? '#4ADE80' : '#4DA3FF',
               cursor: 'pointer',
               transition: 'color 0.2s',
+              flexShrink: 0,
+              whiteSpace: 'nowrap',
             }}
           >
             {copied ? 'Copied!' : 'Copy JSON'}

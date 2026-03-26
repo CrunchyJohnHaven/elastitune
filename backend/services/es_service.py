@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
-from elasticsearch import AsyncElasticsearch, NotFoundError, ConnectionError as ESConnectionError
+from elasticsearch import AsyncElasticsearch, NotFoundError
 
 logger = logging.getLogger(__name__)
 
@@ -120,9 +120,7 @@ class ESService:
 
         # Extract the properties for this index
         index_mapping = mapping.get(index, mapping)
-        properties = (
-            index_mapping.get("mappings", {}).get("properties", {})
-        )
+        properties = index_mapping.get("mappings", {}).get("properties", {})
 
         all_fields = self._walk_properties(properties)
 
@@ -166,21 +164,48 @@ class ESService:
             "domain": domain,
         }
 
-    def _detect_domain(
-        self, docs: List[Dict[str, Any]], text_fields: List[str]
-    ) -> str:
+    def _detect_domain(self, docs: List[Dict[str, Any]], text_fields: List[str]) -> str:
         """Heuristic domain detection from sampled document content."""
         security_keywords = {
-            "cve", "vulnerability", "exploit", "patch", "malware", "threat",
-            "firewall", "breach", "attack", "ransomware", "phishing",
+            "cve",
+            "vulnerability",
+            "exploit",
+            "patch",
+            "malware",
+            "threat",
+            "firewall",
+            "breach",
+            "attack",
+            "ransomware",
+            "phishing",
         }
         dev_keywords = {
-            "api", "function", "method", "class", "module", "library",
-            "sdk", "endpoint", "parameter", "return", "exception", "import",
+            "api",
+            "function",
+            "method",
+            "class",
+            "module",
+            "library",
+            "sdk",
+            "endpoint",
+            "parameter",
+            "return",
+            "exception",
+            "import",
         }
         compliance_keywords = {
-            "regulation", "compliance", "gdpr", "hipaa", "audit", "policy",
-            "requirement", "control", "framework", "standard", "sox", "pci",
+            "regulation",
+            "compliance",
+            "gdpr",
+            "hipaa",
+            "audit",
+            "policy",
+            "requirement",
+            "control",
+            "framework",
+            "standard",
+            "sox",
+            "pci",
         }
 
         text_blob = ""
@@ -303,11 +328,15 @@ class ESService:
             p = profile
         return self._build_query_body(query_text, p, size)
 
-    def _build_query_body(self, query_text: str, p: Any, size: int = 20) -> Dict[str, Any]:
+    def _build_query_body(
+        self, query_text: str, p: Any, size: int = 20
+    ) -> Dict[str, Any]:
         """Build Elasticsearch query body from a SearchProfile."""
-        fields = [
-            f"{f['field']}^{f.get('boost', 1.0)}" for f in p.lexicalFields
-        ] if p.lexicalFields else ["*"]
+        fields = (
+            [f"{f['field']}^{f.get('boost', 1.0)}" for f in p.lexicalFields]
+            if p.lexicalFields
+            else ["*"]
+        )
 
         multi_match: Dict[str, Any] = {
             "query": query_text,

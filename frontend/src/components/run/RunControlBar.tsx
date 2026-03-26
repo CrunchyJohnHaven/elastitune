@@ -74,8 +74,8 @@ export default function RunControlBar({ stage, runId, onStop }: RunControlBarPro
     setContinuing(true);
     try {
       const resp = await api.startRun(connectionId, {
-        durationMinutes: 30,
-        maxExperiments: 200,
+        durationMinutes: runConfig?.durationMinutes ?? 30,
+        maxExperiments: runConfig?.maxExperiments ?? 200,
         personaCount: 36,
         autoStopOnPlateau: true,
         previousRunId: runId,
@@ -83,10 +83,12 @@ export default function RunControlBar({ stage, runId, onStop }: RunControlBarPro
       setRunId(resp.runId);
       setReport(null as unknown as ReportPayload);
       toast.info('Continuing optimization from best profile\u2026');
-      navigate(`/run/${resp.runId}`);
+      // Use replace to ensure clean navigation to the new run
+      navigate(`/run/${resp.runId}`, { replace: true });
     } catch (err) {
       toast.error('Failed to continue. Check your connection.');
       console.error('Continue failed:', err);
+    } finally {
       setContinuing(false);
     }
   };
@@ -99,18 +101,19 @@ export default function RunControlBar({ stage, runId, onStop }: RunControlBarPro
     setContinuing(true);
     try {
       const resp = await api.startRun(connectionId, {
-        durationMinutes: 30,
-        maxExperiments: 200,
+        durationMinutes: runConfig?.durationMinutes ?? 30,
+        maxExperiments: runConfig?.maxExperiments ?? 200,
         personaCount: 36,
         autoStopOnPlateau: true,
       });
       setRunId(resp.runId);
       setReport(null as unknown as ReportPayload);
       toast.info('Starting fresh optimization\u2026');
-      navigate(`/run/${resp.runId}`);
+      navigate(`/run/${resp.runId}`, { replace: true });
     } catch (err) {
       toast.error('Failed to start fresh. Check your connection.');
       console.error('Start fresh failed:', err);
+    } finally {
       setContinuing(false);
     }
   };
@@ -349,7 +352,7 @@ export default function RunControlBar({ stage, runId, onStop }: RunControlBarPro
                 (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(0)';
               }}
             >
-              View Report \u2192
+              View Report {'\u2192'}
             </button>
           </>
         )}

@@ -18,14 +18,24 @@ class FakeESService:
     async def get_cluster_info(self):
         return {"cluster_name": "local-benchmark", "version": {"number": "8.15.1"}}
 
-    async def analyze_index(self, index: str, vector_field_override=None, max_sample_docs=120):
+    async def analyze_index(
+        self, index: str, vector_field_override=None, max_sample_docs=120
+    ):
         return {
             "text_fields": ["title", "description"],
             "vector_field": None,
             "vector_dims": None,
             "sample_docs": [
-                {"_id": "doc_1", "title": "Lip pencil", "description": "Glossy lip pencil"},
-                {"_id": "doc_2", "title": "Foundation", "description": "Serum foundation"},
+                {
+                    "_id": "doc_1",
+                    "title": "Lip pencil",
+                    "description": "Glossy lip pencil",
+                },
+                {
+                    "_id": "doc_2",
+                    "title": "Foundation",
+                    "description": "Serum foundation",
+                },
             ],
             "domain": "general",
         }
@@ -35,7 +45,10 @@ class FakeESService:
 
     async def build_baseline_profile(self, text_fields, vector_field=None):
         return {
-            "lexicalFields": [{"field": field, "boost": 2.0 if i == 0 else 1.0} for i, field in enumerate(text_fields)],
+            "lexicalFields": [
+                {"field": field, "boost": 2.0 if i == 0 else 1.0}
+                for i, field in enumerate(text_fields)
+            ],
             "multiMatchType": "best_fields",
             "minimumShouldMatch": "75%",
             "tieBreaker": 0.0,
@@ -98,8 +111,9 @@ def test_live_connect_uses_uploaded_eval_set_for_baseline_count() -> None:
         ],
     }
 
-    with patch("backend.services.es_service.ESService", FakeESService), patch(
-        "backend.services.llm_service.LLMService", FakeLLMService
+    with (
+        patch("backend.services.es_service.ESService", FakeESService),
+        patch("backend.services.llm_service.LLMService", FakeLLMService),
     ):
         with TestClient(app) as client:
             response = client.post("/api/connect", json=payload)
@@ -125,5 +139,8 @@ def test_benchmark_health_reports_ready_and_setup_required() -> None:
     assert presets["products-catalog"]["docCount"] == 931
     assert presets["books-catalog"]["ready"] is False
     assert presets["books-catalog"]["docCount"] == 1200
-    assert presets["books-catalog"]["setupCommand"] == "python benchmarks/setup.py --only books-catalog"
+    assert (
+        presets["books-catalog"]["setupCommand"]
+        == "python benchmarks/setup.py --only books-catalog"
+    )
     assert presets["workplace-docs"]["ready"] is False

@@ -5,7 +5,11 @@ import logging
 import uuid
 from typing import List, Optional
 
-from .industry_profiles import IndustryProfile, detect_industry_profile, get_industry_profile
+from .industry_profiles import (
+    IndustryProfile,
+    detect_industry_profile,
+    get_industry_profile,
+)
 from .models import CommitteeDocument, CommitteePersona
 
 logger = logging.getLogger(__name__)
@@ -15,7 +19,11 @@ _SEED_PERSONA_DETAILS = [
     {
         "roleInDecision": "economic_buyer",
         "authorityWeight": 0.24,
-        "priorities": ["Clear business value", "Risk-adjusted return", "Practical rollout"],
+        "priorities": [
+            "Clear business value",
+            "Risk-adjusted return",
+            "Practical rollout",
+        ],
         "concerns": ["Budget exposure", "Time to value", "Change management burden"],
         "decisionCriteria": ["ROI clarity", "Executive fit", "Delivery confidence"],
         "likelyObjections": ["The financial case is not concrete enough."],
@@ -27,11 +35,26 @@ _SEED_PERSONA_DETAILS = [
     {
         "roleInDecision": "technical_buyer",
         "authorityWeight": 0.22,
-        "priorities": ["Architecture fit", "Operational simplicity", "Security posture"],
-        "concerns": ["Integration complexity", "Operational overhead", "Migration risk"],
-        "decisionCriteria": ["Implementation feasibility", "Platform alignment", "Supportability"],
+        "priorities": [
+            "Architecture fit",
+            "Operational simplicity",
+            "Security posture",
+        ],
+        "concerns": [
+            "Integration complexity",
+            "Operational overhead",
+            "Migration risk",
+        ],
+        "decisionCriteria": [
+            "Implementation feasibility",
+            "Platform alignment",
+            "Supportability",
+        ],
         "likelyObjections": ["The technical rollout path is underspecified."],
-        "whatWinsThemOver": ["Concrete implementation plan", "Evidence of low operational burden"],
+        "whatWinsThemOver": [
+            "Concrete implementation plan",
+            "Evidence of low operational burden",
+        ],
         "skepticismLevel": 7,
         "domainExpertise": "technical",
         "politicalMotivations": ["Protect team capacity"],
@@ -43,7 +66,11 @@ _SEED_PERSONA_DETAILS = [
         "concerns": ["Security gaps", "Missing caveats", "Approval risk"],
         "decisionCriteria": ["Control detail", "Evidence strength", "Governance fit"],
         "likelyObjections": ["Risk and compliance mitigations are too vague."],
-        "whatWinsThemOver": ["Explicit controls", "Documented safeguards", "Clear caveats"],
+        "whatWinsThemOver": [
+            "Explicit controls",
+            "Documented safeguards",
+            "Clear caveats",
+        ],
         "skepticismLevel": 8,
         "domainExpertise": "risk",
         "politicalMotivations": ["Avoid signing off on unclear exposure"],
@@ -53,8 +80,14 @@ _SEED_PERSONA_DETAILS = [
         "authorityWeight": 0.20,
         "priorities": ["Stakeholder buy-in", "Customer impact", "Execution confidence"],
         "concerns": ["Operational disruption", "Unclear ownership", "Weak narrative"],
-        "decisionCriteria": ["Business relevance", "Stakeholder resonance", "Execution plan"],
-        "likelyObjections": ["The story does not connect clearly to the business problem."],
+        "decisionCriteria": [
+            "Business relevance",
+            "Stakeholder resonance",
+            "Execution plan",
+        ],
+        "likelyObjections": [
+            "The story does not connect clearly to the business problem."
+        ],
         "whatWinsThemOver": ["Strong business framing", "Role-specific proof points"],
         "skepticismLevel": 5,
         "domainExpertise": "operations",
@@ -63,11 +96,19 @@ _SEED_PERSONA_DETAILS = [
     {
         "roleInDecision": "financial_reviewer",
         "authorityWeight": 0.16,
-        "priorities": ["Budget alignment", "Defensible assumptions", "Procurement readiness"],
+        "priorities": [
+            "Budget alignment",
+            "Defensible assumptions",
+            "Procurement readiness",
+        ],
         "concerns": ["Soft savings claims", "Missing baseline", "Procurement friction"],
         "decisionCriteria": ["Cost clarity", "Procurement path", "Payback confidence"],
         "likelyObjections": ["The economic case needs firmer assumptions."],
-        "whatWinsThemOver": ["Baseline numbers", "Payback framing", "Procurement path clarity"],
+        "whatWinsThemOver": [
+            "Baseline numbers",
+            "Payback framing",
+            "Procurement path clarity",
+        ],
         "skepticismLevel": 7,
         "domainExpertise": "finance",
         "politicalMotivations": ["Avoid surprise spend and approval churn"],
@@ -112,7 +153,9 @@ _SBA_PERSONAS = [
         ],
         skepticismLevel=7,
         domainExpertise="technology",
-        politicalMotivations=["Protect security posture without adding operational burden"],
+        politicalMotivations=[
+            "Protect security posture without adding operational burden"
+        ],
     ),
     CommitteePersona(
         id="committee_sba_gc",
@@ -287,7 +330,8 @@ async def build_committee_personas(
         get_industry_profile(industry_profile_id)
         if industry_profile_id
         else detect_industry_profile(
-            [document.documentName, document.rawText] + [section.title for section in document.sections[:8]]
+            [document.documentName, document.rawText]
+            + [section.title for section in document.sections[:8]]
         )
     )
 
@@ -311,8 +355,12 @@ async def build_committee_personas(
         generated = await llm_service.generate_committee_personas(prompt)
         personas = _normalize_weights(_coerce_generated_personas(generated), warnings)
         if personas:
-            return CommitteePersonaBuild(personas=personas, profile=profile, warnings=warnings)
-        warnings.append("AI persona generation returned no valid personas; profile-based committee defaults were used.")
+            return CommitteePersonaBuild(
+                personas=personas, profile=profile, warnings=warnings
+            )
+        warnings.append(
+            "AI persona generation returned no valid personas; profile-based committee defaults were used."
+        )
 
     return CommitteePersonaBuild(
         personas=_normalize_weights(_build_seed_personas(profile), warnings),
@@ -354,7 +402,9 @@ def _coerce_generated_personas(generated: list) -> List[CommitteePersona]:
             continue
         try:
             persona = CommitteePersona(
-                id=str(item.get("id") or f"committee_{index + 1}_{uuid.uuid4().hex[:6]}"),
+                id=str(
+                    item.get("id") or f"committee_{index + 1}_{uuid.uuid4().hex[:6]}"
+                ),
                 name=str(item.get("name", f"Persona {index + 1}")),
                 title=str(item.get("title", "Stakeholder")),
                 organization=str(item.get("organization", "Prospective Buyer")),
@@ -362,12 +412,20 @@ def _coerce_generated_personas(generated: list) -> List[CommitteePersona]:
                 authorityWeight=float(item.get("authorityWeight", 0.2)),
                 priorities=[str(value) for value in item.get("priorities", [])],
                 concerns=[str(value) for value in item.get("concerns", [])],
-                decisionCriteria=[str(value) for value in item.get("decisionCriteria", [])],
-                likelyObjections=[str(value) for value in item.get("likelyObjections", [])],
-                whatWinsThemOver=[str(value) for value in item.get("whatWinsThemOver", [])],
+                decisionCriteria=[
+                    str(value) for value in item.get("decisionCriteria", [])
+                ],
+                likelyObjections=[
+                    str(value) for value in item.get("likelyObjections", [])
+                ],
+                whatWinsThemOver=[
+                    str(value) for value in item.get("whatWinsThemOver", [])
+                ],
                 skepticismLevel=int(item.get("skepticismLevel", 5)),
                 domainExpertise=item.get("domainExpertise"),
-                politicalMotivations=[str(value) for value in item.get("politicalMotivations", [])],
+                politicalMotivations=[
+                    str(value) for value in item.get("politicalMotivations", [])
+                ],
             )
         except Exception:
             continue
@@ -375,7 +433,9 @@ def _coerce_generated_personas(generated: list) -> List[CommitteePersona]:
     return personas
 
 
-def _normalize_weights(personas: List[CommitteePersona], warnings: List[str]) -> List[CommitteePersona]:
+def _normalize_weights(
+    personas: List[CommitteePersona], warnings: List[str]
+) -> List[CommitteePersona]:
     if not personas:
         return personas
     total = sum(max(persona.authorityWeight, 0.0) for persona in personas)
@@ -392,7 +452,11 @@ def _normalize_weights(personas: List[CommitteePersona], warnings: List[str]) ->
     warnings.append("Persona authority weights were normalized to sum to 1.0.")
     logger.warning("Committee persona weights normalized from total=%s", total)
     return [
-        persona.model_copy(update={"authorityWeight": round(max(persona.authorityWeight, 0.0) / total, 4)})
+        persona.model_copy(
+            update={
+                "authorityWeight": round(max(persona.authorityWeight, 0.0) / total, 4)
+            }
+        )
         for persona in personas
     ]
 

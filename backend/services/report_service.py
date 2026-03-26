@@ -25,15 +25,51 @@ class ReportService:
         persona_impact = self._compute_persona_impact(ctx.personas)
         query_breakdown = self._compute_query_breakdown(ctx)
 
-        baseline_score = ctx.metrics.baselineScore
+        # Use the original baseline when this is a continued run
+        is_continuation = bool(ctx.previous_run_id)
+        original_baseline = ctx.original_baseline_score
+        # Fallback: the metrics may have the original baseline even if the
+        # context-level field was lost (e.g. after app restart during chain).
+        if (
+            original_baseline is None
+            and getattr(ctx.metrics, "originalBaselineScore", None) is not None
+        ):
+            original_baseline = ctx.metrics.originalBaselineScore
+        run_baseline_score = ctx.metrics.baselineScore
         best_score = ctx.metrics.bestScore
-        delta_pct = (
-            ((best_score - baseline_score) / max(baseline_score, 0.001)) * 100
+
+        # For the report, show cumulative improvement from the original baseline
+        if original_baseline is not None:
+            baseline_score = original_baseline
+        else:
+            baseline_score = run_baseline_score
+
+        delta_pct = ((best_score - baseline_score) / max(baseline_score, 0.001)) * 100
+
+        # Cumulative experiment counts across the chain — prefer context
+        # fields, fall back to the metrics priors set during run init.
+        prior_exp = (
+            ctx.prior_experiments_run
+            or getattr(ctx.metrics, "priorExperimentsRun", 0)
+            or 0
         )
+        prior_kept = (
+            ctx.prior_improvements_kept
+            or getattr(ctx.metrics, "priorImprovementsKept", 0)
+            or 0
+        )
+        total_experiments = ctx.metrics.experimentsRun + prior_exp
+        total_kept_all = ctx.metrics.improvementsKept + prior_kept
 
         kept = [e for e in ctx.experiments if e.decision == "kept"]
-        top_changes = [e.change.label for e in kept][:2]
-        top_changes_text = " and ".join(top_changes) if top_changes else "lexical tuning"
+        all_kept_changes = [e.change.label for e in kept]
+        # Also include prior experiments' changes
+        prior_kept_exps = [e for e in ctx.prior_experiments if e.decision == "kept"]
+        all_kept_changes = [e.change.label for e in prior_kept_exps] + all_kept_changes
+        top_changes = all_kept_changes[:2]
+        top_changes_text = (
+            " and ".join(top_changes) if top_changes else "lexical tuning"
+        )
         duration_seconds = self._compute_duration_seconds(ctx)
         duration_text = self._format_duration(duration_seconds)
 
@@ -41,36 +77,41 @@ class ReportService:
         improved_queries = sum(1 for q in query_breakdown if q.deltaPct > 1.0)
         degraded_queries = sum(1 for q in query_breakdown if q.deltaPct < -1.0)
 
-        headline = (
-            f"Search quality improved {delta_pct:+.1f}% on {ctx.summary.baselineEvalCount} test queries."
-        )
+        headline = f"Search quality improved {delta_pct:+.1f}% on {ctx.summary.baselineEvalCount} test queries."
 
-        overview = (
-            f"ElastiTune evaluated `{ctx.summary.indexName}` for about {duration_text}, ran "
-            f"{ctx.metrics.experimentsRun} experiments, and kept {len(kept)} changes that improved "
-            f"nDCG@10 from {baseline_score:.3f} to {best_score:.3f}. "
-            f"The strongest gains came from {top_changes_text}."
-        )
+        if is_continuation:
+            overview = (
+                f"ElastiTune evaluated `{ctx.summary.indexName}` across multiple optimization runs, "
+                f"running {total_experiments} total experiments and keeping {total_kept_all} changes that improved "
+                f"nDCG@10 from {baseline_score:.3f} (original baseline) to {best_score:.3f}. "
+                f"The strongest gains came from {top_changes_text}."
+            )
+        else:
+            overview = (
+                f"ElastiTune evaluated `{ctx.summary.indexName}` for about {duration_text}, ran "
+                f"{ctx.metrics.experimentsRun} experiments, and kept {len(kept)} changes that improved "
+                f"nDCG@10 from {baseline_score:.3f} to {best_score:.3f}. "
+                f"The strongest gains came from {top_changes_text}."
+            )
 
         if query_breakdown:
-            overview += (
-                f" Across individual queries, {improved_queries} of {len(query_breakdown)} improved"
-            )
+            overview += f" Across individual queries, {improved_queries} of {len(query_breakdown)} improved"
             if degraded_queries > 0:
                 overview += f" while {degraded_queries} saw minor regressions"
             overview += "."
 
-        is_continuation = bool(ctx.previous_run_id)
         next_steps = []
         if is_continuation:
             next_steps.append(
                 "This run continued from a previous optimization. Compare the cumulative improvement against the original baseline."
             )
-        next_steps.extend([
-            "Review the accepted profile changes first and confirm they match the kinds of queries your users care about most.",
-            f"Validate the tuned profile against a larger test set than the current {ctx.summary.baselineEvalCount}-query benchmark before promoting it.",
-            "Save this profile as a candidate baseline and rerun ElastiTune after adding fresh user intents or failure cases.",
-        ])
+        next_steps.extend(
+            [
+                "Review the accepted profile changes first and confirm they match the kinds of queries your users care about most.",
+                f"Validate the tuned profile against a larger test set than the current {ctx.summary.baselineEvalCount}-query benchmark before promoting it.",
+                "Save this profile as a candidate baseline and rerun ElastiTune after adding fresh user intents or failure cases.",
+            ]
+        )
 
         if ctx.compression.projectedMonthlySavingsUsd:
             overview += (
@@ -81,7 +122,7 @@ class ReportService:
                 "If vector search is important in this index, test the recommended compression setting before rolling it into production."
             )
 
-        return ReportPayload(
+        report = ReportPayload(
             runId=ctx.run_id,
             generatedAt=datetime.now(timezone.utc).isoformat(),
             mode=ctx.mode,
@@ -96,6 +137,10 @@ class ReportService:
                 improvementsKept=len(kept),
                 durationSeconds=duration_seconds,
                 projectedMonthlySavingsUsd=ctx.compression.projectedMonthlySavingsUsd,
+                isContinuation=is_continuation,
+                originalBaselineScore=original_baseline if is_continuation else None,
+                totalExperimentsRun=total_experiments if is_continuation else None,
+                totalImprovementsKept=total_kept_all if is_continuation else None,
             ),
             connection=ctx.summary,
             connectionConfig=ReportConnectionConfig(
@@ -116,6 +161,7 @@ class ReportService:
             warnings=ctx.warnings,
             previousRunId=ctx.previous_run_id,
         )
+        return report.sanitize_for_client()
 
     # ------------------------------------------------------------------
     # Helpers
@@ -190,45 +236,63 @@ class ReportService:
                 ec = eval_lookup.get(query_id)
                 baseline = scores.get("baseline", 0.0)
                 best = scores.get("best", baseline)
-                delta = ((best - baseline) / max(baseline, 0.001)) * 100 if baseline > 0 else 0.0
-                rows.append(QueryBreakdownRow(
-                    queryId=query_id,
-                    query=ec.query if ec else query_id,
-                    difficulty=ec.difficulty or "medium" if ec else "medium",
-                    baselineScore=round(baseline, 4),
-                    bestScore=round(best, 4),
-                    deltaPct=round(delta, 1),
-                    failureReason=self._infer_failure_reason(
-                        baseline,
-                        best,
-                        ctx.per_query_results.get(query_id, {}).get("baseline", []),
-                    ),
-                    topRelevantDocIds=ec.relevantDocIds[:5] if ec else [],
-                    baselineTopResults=ctx.per_query_results.get(query_id, {}).get("baseline", []),
-                    bestTopResults=ctx.per_query_results.get(query_id, {}).get("best", []),
-                ))
+                delta = (
+                    ((best - baseline) / max(baseline, 0.001)) * 100
+                    if baseline > 0
+                    else 0.0
+                )
+                rows.append(
+                    QueryBreakdownRow(
+                        queryId=query_id,
+                        query=ec.query if ec else query_id,
+                        difficulty=ec.difficulty or "medium" if ec else "medium",
+                        baselineScore=round(baseline, 4),
+                        bestScore=round(best, 4),
+                        deltaPct=round(delta, 1),
+                        failureReason=self._infer_failure_reason(
+                            baseline,
+                            best,
+                            ctx.per_query_results.get(query_id, {}).get("baseline", []),
+                        ),
+                        topRelevantDocIds=ec.relevantDocIds[:5] if ec else [],
+                        baselineTopResults=ctx.per_query_results.get(query_id, {}).get(
+                            "baseline", []
+                        ),
+                        bestTopResults=ctx.per_query_results.get(query_id, {}).get(
+                            "best", []
+                        ),
+                    )
+                )
         else:
             # Fallback: estimate from eval set and overall scores
             baseline_score = ctx.metrics.baselineScore
             best_score = ctx.metrics.bestScore
             for ec in ctx.eval_set:
-                delta = ((best_score - baseline_score) / max(baseline_score, 0.001)) * 100
-                rows.append(QueryBreakdownRow(
-                    queryId=ec.id,
-                    query=ec.query,
-                    difficulty=ec.difficulty or "medium",
-                    baselineScore=round(baseline_score, 4),
-                    bestScore=round(best_score, 4),
-                    deltaPct=round(delta, 1),
-                    failureReason=self._infer_failure_reason(
-                        baseline_score,
-                        best_score,
-                        ctx.per_query_results.get(ec.id, {}).get("baseline", []),
-                    ),
-                    topRelevantDocIds=ec.relevantDocIds[:5],
-                    baselineTopResults=ctx.per_query_results.get(ec.id, {}).get("baseline", []),
-                    bestTopResults=ctx.per_query_results.get(ec.id, {}).get("best", []),
-                ))
+                delta = (
+                    (best_score - baseline_score) / max(baseline_score, 0.001)
+                ) * 100
+                rows.append(
+                    QueryBreakdownRow(
+                        queryId=ec.id,
+                        query=ec.query,
+                        difficulty=ec.difficulty or "medium",
+                        baselineScore=round(baseline_score, 4),
+                        bestScore=round(best_score, 4),
+                        deltaPct=round(delta, 1),
+                        failureReason=self._infer_failure_reason(
+                            baseline_score,
+                            best_score,
+                            ctx.per_query_results.get(ec.id, {}).get("baseline", []),
+                        ),
+                        topRelevantDocIds=ec.relevantDocIds[:5],
+                        baselineTopResults=ctx.per_query_results.get(ec.id, {}).get(
+                            "baseline", []
+                        ),
+                        bestTopResults=ctx.per_query_results.get(ec.id, {}).get(
+                            "best", []
+                        ),
+                    )
+                )
 
         # Sort by improvement (biggest gains first)
         rows.sort(key=lambda r: r.deltaPct, reverse=True)
@@ -281,7 +345,9 @@ class ReportService:
         if ctx.started_at and ctx.completed_at:
             try:
                 started = datetime.fromisoformat(ctx.started_at.replace("Z", "+00:00"))
-                completed = datetime.fromisoformat(ctx.completed_at.replace("Z", "+00:00"))
+                completed = datetime.fromisoformat(
+                    ctx.completed_at.replace("Z", "+00:00")
+                )
                 return max(0.0, (completed - started).total_seconds())
             except Exception:
                 pass

@@ -14,7 +14,6 @@ from ..models.contracts import (
     ConnectionSummary,
     EvalCase,
     LlmConfig,
-    RunStage,
     SampleDoc,
     SearchProfile,
 )
@@ -65,7 +64,9 @@ def _get_run_manager(request: Request) -> RunManager:
 
 
 @router.get("/connect/benchmarks")
-async def benchmark_health(request: Request, esUrl: str = "http://127.0.0.1:9200") -> JSONResponse:
+async def benchmark_health(
+    request: Request, esUrl: str = "http://127.0.0.1:9200"
+) -> JSONResponse:
     from ..services.es_service import ESService
 
     es_svc = ESService(es_url=esUrl)
@@ -133,7 +134,9 @@ async def connect(body: ConnectRequest, request: Request) -> ConnectResponse:
     if not body.esUrl:
         raise HTTPException(status_code=422, detail="esUrl is required for live mode")
     if not body.indexName:
-        raise HTTPException(status_code=422, detail="indexName is required for live mode")
+        raise HTTPException(
+            status_code=422, detail="indexName is required for live mode"
+        )
 
     from ..services.es_service import ESService
     from ..services.llm_service import LLMService
@@ -145,17 +148,23 @@ async def connect(body: ConnectRequest, request: Request) -> ConnectResponse:
     try:
         alive = await es_svc.ping()
         if not alive:
-            raise HTTPException(status_code=502, detail="Cannot reach Elasticsearch cluster")
+            raise HTTPException(
+                status_code=502, detail="Cannot reach Elasticsearch cluster"
+            )
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Elasticsearch connection failed: {exc}")
+        raise HTTPException(
+            status_code=502, detail=f"Elasticsearch connection failed: {exc}"
+        )
 
     # Cluster info
     cluster_info = await es_svc.get_cluster_info()
     cluster_name: str = cluster_info.get("cluster_name", "unknown")
     cluster_version: Optional[str] = (
-        cluster_info.get("version", {}).get("number") if isinstance(cluster_info.get("version"), dict) else None
+        cluster_info.get("version", {}).get("number")
+        if isinstance(cluster_info.get("version"), dict)
+        else None
     )
 
     # Analyse index
@@ -186,7 +195,9 @@ async def connect(body: ConnectRequest, request: Request) -> ConnectResponse:
     domain = analysis["domain"]
 
     if not text_fields:
-        warnings.append("No text fields detected in index mapping. Search quality may be limited.")
+        warnings.append(
+            "No text fields detected in index mapping. Search quality may be limited."
+        )
 
     doc_count = await es_svc.count_docs(body.indexName)
     benchmark = _BENCHMARK_CONFIGS.get(body.indexName)
@@ -199,16 +210,20 @@ async def connect(body: ConnectRequest, request: Request) -> ConnectResponse:
     # Build SampleDoc list
     sample_docs: List[SampleDoc] = []
     title_field = text_fields[0] if text_fields else "title"
-    excerpt_field = text_fields[1] if len(text_fields) > 1 else text_fields[0] if text_fields else "description"
+    excerpt_field = (
+        text_fields[1]
+        if len(text_fields) > 1
+        else text_fields[0]
+        if text_fields
+        else "description"
+    )
 
     for doc in raw_docs[:10]:
         doc_id = str(doc.get("_id", ""))
         title_val = str(doc.get(title_field, doc_id))[:100]
         excerpt_val = str(doc.get(excerpt_field, ""))[:300]
         field_preview = {
-            f: str(doc.get(f, ""))[:100]
-            for f in text_fields[:4]
-            if f in doc
+            f: str(doc.get(f, ""))[:100] for f in text_fields[:4] if f in doc
         }
         sample_docs.append(
             SampleDoc(
@@ -278,9 +293,13 @@ async def connect(body: ConnectRequest, request: Request) -> ConnectResponse:
         vector_field=vector_field,
     )
     baseline_profile = SearchProfile(**profile_dict)
-    baseline_profile, benchmark_hint = ProfileRecommender().recommend(summary, baseline_profile)
+    baseline_profile, benchmark_hint = ProfileRecommender().recommend(
+        summary, baseline_profile
+    )
     if benchmark_hint:
-        warnings.append(f"Seeded the starting profile using the {benchmark_hint} benchmark pattern.")
+        warnings.append(
+            f"Seeded the starting profile using the {benchmark_hint} benchmark pattern."
+        )
 
     ctx = ConnectionContext(
         connection_id=connection_id,
@@ -334,8 +353,17 @@ async def probe_index(body: ConnectRequest, request: Request) -> JSONResponse:
 
         failures = []
         for idx, doc in enumerate(analysis["sample_docs"][:12], start=1):
-            title = str(doc.get("title") or doc.get("name") or doc.get("summary") or doc.get("_id", ""))
-            query_terms = [part for part in re.split(r"[^a-zA-Z0-9]+", title.lower()) if len(part) > 3][:4]
+            title = str(
+                doc.get("title")
+                or doc.get("name")
+                or doc.get("summary")
+                or doc.get("_id", "")
+            )
+            query_terms = [
+                part
+                for part in re.split(r"[^a-zA-Z0-9]+", title.lower())
+                if len(part) > 3
+            ][:4]
             if not query_terms:
                 continue
             query = " ".join(query_terms)

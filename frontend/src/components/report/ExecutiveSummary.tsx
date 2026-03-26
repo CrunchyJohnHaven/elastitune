@@ -71,6 +71,9 @@ function MetricCard({
 export default function ExecutiveSummary({ report }: ExecutiveSummaryProps) {
   const { summary, generatedAt, mode } = report;
   const improvementPositive = summary.improvementPct >= 0;
+  const isContinuation = summary.isContinuation ?? false;
+  const displayExperiments = summary.totalExperimentsRun ?? summary.experimentsRun;
+  const displayKept = summary.totalImprovementsKept ?? summary.improvementsKept;
 
   const generatedDate = new Date(generatedAt).toLocaleString('en-US', {
     dateStyle: 'medium',
@@ -286,7 +289,7 @@ export default function ExecutiveSummary({ report }: ExecutiveSummaryProps) {
         }}
       >
         <MetricCard
-          label="Baseline nDCG@10"
+          label={isContinuation ? "Original Baseline" : "Baseline nDCG@10"}
           value={formatScore(summary.baselineScore)}
           accent="#9AA4B2"
         />
@@ -296,14 +299,14 @@ export default function ExecutiveSummary({ report }: ExecutiveSummaryProps) {
           accent={ACCENT_BLUE}
         />
         <MetricCard
-          label="Improvement"
+          label={isContinuation ? "Cumulative Gain" : "Improvement"}
           value={formatPercent(summary.improvementPct)}
           accent={improvementPositive ? '#4ADE80' : '#FB7185'}
         />
         <MetricCard
-          label="Experiments"
-          value={String(summary.experimentsRun)}
-          sub={`${summary.improvementsKept} kept`}
+          label={isContinuation ? "Total Experiments" : "Experiments"}
+          value={String(displayExperiments)}
+          sub={`${displayKept} kept${isContinuation ? ' (cumulative)' : ''}`}
         />
         {summary.projectedMonthlySavingsUsd != null &&
           summary.projectedMonthlySavingsUsd > 0 && (

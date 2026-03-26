@@ -179,7 +179,7 @@ export default function ExperimentTable({
                       }}
                     >
                       <span style={{ color: '#6B7480' }}>
-                        {formatScore(exp.baselineScore)}
+                        {formatScore(exp.beforeScore ?? exp.baselineScore ?? 0)}
                       </span>
                       <span style={{ color: '#4B5563', margin: '0 4px' }}>→</span>
                       <span style={{ color: isKept ? '#4ADE80' : '#EEF3FF' }}>

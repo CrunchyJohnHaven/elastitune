@@ -1,7 +1,7 @@
 import asyncio
 import numpy as np
-from typing import List, Optional, Tuple, Dict
-from ..models.contracts import CompressionMethodResult, CompressionSummary, ConnectionSummary
+from typing import Tuple
+from ..models.contracts import CompressionMethodResult, CompressionSummary
 from ..models.runtime import RunContext
 
 COST_PER_GB_MONTH = 0.095  # USD
@@ -17,7 +17,9 @@ def quantize_int8(vectors: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarr
     return quantized, min_vals, scale
 
 
-def dequantize_int8(quantized: np.ndarray, min_vals: np.ndarray, scale: np.ndarray) -> np.ndarray:
+def dequantize_int8(
+    quantized: np.ndarray, min_vals: np.ndarray, scale: np.ndarray
+) -> np.ndarray:
     return quantized.astype(np.float32) * scale + min_vals
 
 
@@ -30,7 +32,9 @@ def quantize_int4(vectors: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarr
     return quantized, min_vals, scale
 
 
-def dequantize_int4(quantized: np.ndarray, min_vals: np.ndarray, scale: np.ndarray) -> np.ndarray:
+def dequantize_int4(
+    quantized: np.ndarray, min_vals: np.ndarray, scale: np.ndarray
+) -> np.ndarray:
     return quantized.astype(np.float32) * scale + min_vals
 
 
@@ -41,8 +45,9 @@ def random_rotation_matrix(dims: int) -> np.ndarray:
     return Q
 
 
-def compute_recall_at_k(query_vecs: np.ndarray, db_vecs: np.ndarray,
-                         approx_db: np.ndarray, k: int = 10) -> float:
+def compute_recall_at_k(
+    query_vecs: np.ndarray, db_vecs: np.ndarray, approx_db: np.ndarray, k: int = 10
+) -> float:
     """Compute approximate recall@k against exact nearest neighbors."""
     n_queries = min(len(query_vecs), 100)
     query_vecs = query_vecs[:n_queries]
@@ -70,41 +75,65 @@ async def run_compression_benchmark(ctx: RunContext, run_manager, es_service=Non
     if not summary.vectorField or not summary.vectorDims:
         ctx.compression = CompressionSummary(
             available=False,
-            status='skipped',
+            status="skipped",
         )
-        await run_manager.publish(ctx.run_id, {
-            "type": "compression.updated",
-            "payload": ctx.compression.model_dump()
-        })
+        await run_manager.publish(
+            ctx.run_id,
+            {"type": "compression.updated", "payload": ctx.compression.model_dump()},
+        )
         return
 
     ctx.compression = CompressionSummary(
         available=True,
         vectorField=summary.vectorField,
         vectorDims=summary.vectorDims,
-        status='running',
+        status="running",
         methods=[
-            CompressionMethodResult(method='float32', sizeBytes=0, recallAt10=1.0,
-                                    estimatedMonthlyCostUsd=0, sizeReductionPct=0, status='running'),
-            CompressionMethodResult(method='int8', sizeBytes=0, recallAt10=0,
-                                    estimatedMonthlyCostUsd=0, sizeReductionPct=0, status='pending'),
-            CompressionMethodResult(method='int4', sizeBytes=0, recallAt10=0,
-                                    estimatedMonthlyCostUsd=0, sizeReductionPct=0, status='pending'),
-            CompressionMethodResult(method='rotated_int4', sizeBytes=0, recallAt10=0,
-                                    estimatedMonthlyCostUsd=0, sizeReductionPct=0, status='pending'),
-        ]
+            CompressionMethodResult(
+                method="float32",
+                sizeBytes=0,
+                recallAt10=1.0,
+                estimatedMonthlyCostUsd=0,
+                sizeReductionPct=0,
+                status="running",
+            ),
+            CompressionMethodResult(
+                method="int8",
+                sizeBytes=0,
+                recallAt10=0,
+                estimatedMonthlyCostUsd=0,
+                sizeReductionPct=0,
+                status="pending",
+            ),
+            CompressionMethodResult(
+                method="int4",
+                sizeBytes=0,
+                recallAt10=0,
+                estimatedMonthlyCostUsd=0,
+                sizeReductionPct=0,
+                status="pending",
+            ),
+            CompressionMethodResult(
+                method="rotated_int4",
+                sizeBytes=0,
+                recallAt10=0,
+                estimatedMonthlyCostUsd=0,
+                sizeReductionPct=0,
+                status="pending",
+            ),
+        ],
     )
 
-    await run_manager.publish(ctx.run_id, {
-        "type": "compression.updated",
-        "payload": ctx.compression.model_dump()
-    })
+    await run_manager.publish(
+        ctx.run_id,
+        {"type": "compression.updated", "payload": ctx.compression.model_dump()},
+    )
 
     dims = summary.vectorDims
     doc_count = min(summary.docCount, 2000)
 
     try:
-        if ctx.mode == 'demo':
+        if ctx.mode == "demo":
             # Use synthetic vectors for demo
             rng = np.random.RandomState(42)
             db_vecs = rng.randn(doc_count, dims).astype(np.float32)
@@ -118,12 +147,15 @@ async def run_compression_benchmark(ctx: RunContext, run_manager, es_service=Non
         else:
             # For live mode, try to fetch vectors from ES
             # This is optional - if not available, skip
-            ctx.compression.status = 'skipped'
+            ctx.compression.status = "skipped"
             ctx.compression.available = False
-            await run_manager.publish(ctx.run_id, {
-                "type": "compression.updated",
-                "payload": ctx.compression.model_dump()
-            })
+            await run_manager.publish(
+                ctx.run_id,
+                {
+                    "type": "compression.updated",
+                    "payload": ctx.compression.model_dump(),
+                },
+            )
             return
 
         # float32 baseline
@@ -131,18 +163,18 @@ async def run_compression_benchmark(ctx: RunContext, run_manager, es_service=Non
         float32_cost = (float32_bytes / 1e9) * COST_PER_GB_MONTH
 
         ctx.compression.methods[0] = CompressionMethodResult(
-            method='float32',
+            method="float32",
             sizeBytes=float32_bytes,
             recallAt10=1.0,
             estimatedMonthlyCostUsd=round(float32_cost, 2),
             sizeReductionPct=0.0,
-            status='done',
+            status="done",
         )
         await _publish_compression(ctx, run_manager)
         await asyncio.sleep(0.3)
 
         # int8
-        ctx.compression.methods[1].status = 'running'
+        ctx.compression.methods[1].status = "running"
         await _publish_compression(ctx, run_manager)
 
         q8, min8, scale8 = quantize_int8(db_vecs)
@@ -152,18 +184,18 @@ async def run_compression_benchmark(ctx: RunContext, run_manager, es_service=Non
         int8_cost = (int8_bytes / 1e9) * COST_PER_GB_MONTH
 
         ctx.compression.methods[1] = CompressionMethodResult(
-            method='int8',
+            method="int8",
             sizeBytes=int8_bytes,
             recallAt10=round(recall8, 4),
             estimatedMonthlyCostUsd=round(int8_cost, 2),
             sizeReductionPct=round((1 - int8_bytes / float32_bytes) * 100, 1),
-            status='done',
+            status="done",
         )
         await _publish_compression(ctx, run_manager)
         await asyncio.sleep(0.3)
 
         # int4
-        ctx.compression.methods[2].status = 'running'
+        ctx.compression.methods[2].status = "running"
         await _publish_compression(ctx, run_manager)
 
         q4, min4, scale4 = quantize_int4(db_vecs)
@@ -173,22 +205,22 @@ async def run_compression_benchmark(ctx: RunContext, run_manager, es_service=Non
         int4_cost = (int4_bytes / 1e9) * COST_PER_GB_MONTH
 
         ctx.compression.methods[2] = CompressionMethodResult(
-            method='int4',
+            method="int4",
             sizeBytes=int4_bytes,
             recallAt10=round(recall4, 4),
             estimatedMonthlyCostUsd=round(int4_cost, 2),
             sizeReductionPct=round((1 - int4_bytes / float32_bytes) * 100, 1),
-            status='done',
+            status="done",
         )
         await _publish_compression(ctx, run_manager)
         await asyncio.sleep(0.3)
 
         # rotated_int4
-        ctx.compression.methods[3].status = 'running'
+        ctx.compression.methods[3].status = "running"
         await _publish_compression(ctx, run_manager)
 
         rotation = random_rotation_matrix(dims)
-        rotated = (db_vecs @ rotation.T)
+        rotated = db_vecs @ rotation.T
         q4r, min4r, scale4r = quantize_int4(rotated)
         deq4r = dequantize_int4(q4r, min4r, scale4r)
 
@@ -199,12 +231,12 @@ async def run_compression_benchmark(ctx: RunContext, run_manager, es_service=Non
         rot4_cost = (rot4_bytes / 1e9) * COST_PER_GB_MONTH
 
         ctx.compression.methods[3] = CompressionMethodResult(
-            method='rotated_int4',
+            method="rotated_int4",
             sizeBytes=rot4_bytes,
             recallAt10=round(recall4r, 4),
             estimatedMonthlyCostUsd=round(rot4_cost, 2),
             sizeReductionPct=round((1 - rot4_bytes / float32_bytes) * 100, 1),
-            status='done',
+            status="done",
             note="Random orthogonal rotation applied before quantization",
         )
 
@@ -218,20 +250,22 @@ async def run_compression_benchmark(ctx: RunContext, run_manager, es_service=Non
                 float32_cost - best.estimatedMonthlyCostUsd, 2
             )
 
-        ctx.compression.status = 'done'
-        ctx.metrics.projectedMonthlySavingsUsd = ctx.compression.projectedMonthlySavingsUsd
+        ctx.compression.status = "done"
+        ctx.metrics.projectedMonthlySavingsUsd = (
+            ctx.compression.projectedMonthlySavingsUsd
+        )
 
         await _publish_compression(ctx, run_manager)
 
     except asyncio.CancelledError:
         return
-    except Exception as e:
-        ctx.compression.status = 'error'
+    except Exception:
+        ctx.compression.status = "error"
         await _publish_compression(ctx, run_manager)
 
 
 async def _publish_compression(ctx: RunContext, run_manager):
-    await run_manager.publish(ctx.run_id, {
-        "type": "compression.updated",
-        "payload": ctx.compression.model_dump()
-    })
+    await run_manager.publish(
+        ctx.run_id,
+        {"type": "compression.updated", "payload": ctx.compression.model_dump()},
+    )

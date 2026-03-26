@@ -51,7 +51,9 @@ def parse_document_bytes(filename: str, payload: bytes) -> CommitteeDocument:
     )
 
 
-def _parse_pdf(filename: str, payload: bytes) -> tuple[List[DocumentSection], str, List[str]]:
+def _parse_pdf(
+    filename: str, payload: bytes
+) -> tuple[List[DocumentSection], str, List[str]]:
     sections: List[DocumentSection] = []
     warnings: List[str] = []
     try:
@@ -62,20 +64,25 @@ def _parse_pdf(filename: str, payload: bytes) -> tuple[List[DocumentSection], st
             raw_pages: List[List[str]] = []
             counter: Counter[str] = Counter()
             for page in reader.pages:
-                lines = [_normalize_line(line) for line in (page.extract_text() or "").splitlines()]
+                lines = [
+                    _normalize_line(line)
+                    for line in (page.extract_text() or "").splitlines()
+                ]
                 lines = [line for line in lines if line]
                 raw_pages.append(lines)
                 counter.update(set(lines))
 
             repeated_threshold = max(3, int(len(raw_pages) * 0.6))
             repeated_lines = {
-                line for line, count in counter.items()
+                line
+                for line, count in counter.items()
                 if count >= repeated_threshold or _looks_like_pdf_chrome(line)
             }
 
             for index, lines in enumerate(raw_pages, start=1):
                 cleaned_lines = [
-                    line for line in lines
+                    line
+                    for line in lines
                     if line not in repeated_lines
                     and not _is_page_number(line)
                     and not _looks_like_slide_artifact(line)
@@ -94,7 +101,10 @@ def _parse_pdf(filename: str, payload: bytes) -> tuple[List[DocumentSection], st
     try:
         import subprocess
 
-        with tempfile.NamedTemporaryFile(suffix=".pdf") as src, tempfile.NamedTemporaryFile(suffix=".txt") as out:
+        with (
+            tempfile.NamedTemporaryFile(suffix=".pdf") as src,
+            tempfile.NamedTemporaryFile(suffix=".txt") as out,
+        ):
             src.write(payload)
             src.flush()
             subprocess.run(
@@ -106,7 +116,9 @@ def _parse_pdf(filename: str, payload: bytes) -> tuple[List[DocumentSection], st
             text = Path(out.name).read_text(encoding="utf-8", errors="ignore")
         compat_sections = _chunk_text_sections(text)
         if compat_sections:
-            warnings.append("PDF text was extracted in compatibility mode; section boundaries may be approximate.")
+            warnings.append(
+                "PDF text was extracted in compatibility mode; section boundaries may be approximate."
+            )
             return compat_sections, "compatibility", warnings
     except Exception as exc:
         logger.warning("Compatibility PDF parsing failed for %s: %s", filename, exc)
@@ -124,7 +136,9 @@ def _parse_docx(payload: bytes) -> List[DocumentSection]:
         handle.write(payload)
         handle.flush()
         document = DocxDocument(handle.name)
-        paragraphs = [paragraph for paragraph in document.paragraphs if paragraph.text.strip()]
+        paragraphs = [
+            paragraph for paragraph in document.paragraphs if paragraph.text.strip()
+        ]
 
     sections: List[DocumentSection] = []
     current_title: Optional[str] = None
@@ -184,7 +198,9 @@ def _parse_pptx(payload: bytes) -> List[DocumentSection]:
                 texts.append(value)
             merged = "\n".join(texts).strip()
             if merged:
-                sections.append(_section_from_text(slide_index, merged, [slide_index], title=title))
+                sections.append(
+                    _section_from_text(slide_index, merged, [slide_index], title=title)
+                )
         return sections or _chunk_text_sections("")
 
 
@@ -206,7 +222,9 @@ def _section_from_text(
     title: Optional[str] = None,
 ) -> DocumentSection:
     normalized = re.sub(r"\s+\n", "\n", text).strip()
-    lines = [line.strip(" -\u2022\t") for line in normalized.splitlines() if line.strip()]
+    lines = [
+        line.strip(" -\u2022\t") for line in normalized.splitlines() if line.strip()
+    ]
     derived_title = title or (lines[0][:90] if lines else f"Section {index}")
     content_lines = lines[1:] if title is None and len(lines) > 1 else lines
     content = "\n".join(content_lines).strip() or normalized
@@ -250,28 +268,52 @@ def _extract_stats(text: str) -> List[str]:
 
 
 def _extract_claims(text: str) -> List[str]:
-    sentences = [sentence.strip() for sentence in _SENTENCE_SPLIT.split(text) if sentence.strip()]
-    candidates = [sentence for sentence in sentences if 6 <= len(sentence.split()) <= 24]
+    sentences = [
+        sentence.strip() for sentence in _SENTENCE_SPLIT.split(text) if sentence.strip()
+    ]
+    candidates = [
+        sentence for sentence in sentences if 6 <= len(sentence.split()) <= 24
+    ]
     return candidates[:4]
 
 
 def _extract_proof_points(text: str) -> List[str]:
     lines = [line.strip() for line in text.splitlines() if line.strip()]
-    keywords = ("report", "hours", "saved", "faster", "federal", "fedramp", "oig", "cisa", "search.gov")
-    matches = [line for line in lines if any(keyword in line.lower() for keyword in keywords)]
+    keywords = (
+        "report",
+        "hours",
+        "saved",
+        "faster",
+        "federal",
+        "fedramp",
+        "oig",
+        "cisa",
+        "search.gov",
+    )
+    matches = [
+        line for line in lines if any(keyword in line.lower() for keyword in keywords)
+    ]
     return matches[:4]
 
 
 def _extract_cta(text: str) -> Optional[str]:
     for sentence in _SENTENCE_SPLIT.split(text):
         lowered = sentence.lower()
-        if any(token in lowered for token in ("next step", "schedule", "discovery", "demo", "call")):
+        if any(
+            token in lowered
+            for token in ("next step", "schedule", "discovery", "demo", "call")
+        ):
             return sentence.strip()
     return None
 
 
 def _normalize_line(line: str) -> str:
-    normalized = line.replace("\u00a0", " ").replace("ʼ", "'").replace("→", " to ").replace("➔", "- ")
+    normalized = (
+        line.replace("\u00a0", " ")
+        .replace("ʼ", "'")
+        .replace("→", " to ")
+        .replace("➔", "- ")
+    )
     normalized = normalized.replace("\ue0a3", "").replace("\ue088", "")
     normalized = re.sub(r"\s+", " ", normalized)
     return normalized.strip(" |")
@@ -279,7 +321,10 @@ def _normalize_line(line: str) -> str:
 
 def _looks_like_pdf_chrome(line: str) -> bool:
     lowered = line.lower()
-    return any(token in lowered for token in ("elastic perspective", "elastic.co", "all rights reserved"))
+    return any(
+        token in lowered
+        for token in ("elastic perspective", "elastic.co", "all rights reserved")
+    )
 
 
 def _is_page_number(line: str) -> bool:
@@ -321,7 +366,18 @@ def _select_title(lines: List[str], index: int) -> str:
 
 def _is_metadata_line(line: str) -> bool:
     lowered = line.lower()
-    return any(token in lowered for token in ("march", "built for", "an elastic perspective", "sources:", "copyright", "©", "account team"))
+    return any(
+        token in lowered
+        for token in (
+            "march",
+            "built for",
+            "an elastic perspective",
+            "sources:",
+            "copyright",
+            "©",
+            "account team",
+        )
+    )
 
 
 def _heading_score(line: str) -> float:
@@ -337,19 +393,41 @@ def _heading_score(line: str) -> float:
         score -= 0.8
     if line.endswith("."):
         score -= 0.4
-    title_case_ratio = sum(1 for word in words if word[:1].isupper()) / max(len(words), 1)
+    title_case_ratio = sum(1 for word in words if word[:1].isupper()) / max(
+        len(words), 1
+    )
     score += title_case_ratio
     lowered = line.lower()
     if lowered == "agenda":
         return 10.0
-    if any(token in lowered for token in ("agenda", "summary", "priorities", "search", "proof", "risk", "action", "opportunity", "overview", "analysis", "landscape", "deployment", "impact", "inconsistency")):
+    if any(
+        token in lowered
+        for token in (
+            "agenda",
+            "summary",
+            "priorities",
+            "search",
+            "proof",
+            "risk",
+            "action",
+            "opportunity",
+            "overview",
+            "analysis",
+            "landscape",
+            "deployment",
+            "impact",
+            "inconsistency",
+        )
+    ):
         score += 1.5
     if ":" in line:
         score += 0.3
     return score
 
 
-def _infer_section_type(title: str, content: str, stats: Iterable[str], cta: Optional[str]) -> str:
+def _infer_section_type(
+    title: str, content: str, stats: Iterable[str], cta: Optional[str]
+) -> str:
     lowered_title = title.lower()
     lowered_content = content.lower()
     if "appendix" in lowered_title:
@@ -362,7 +440,10 @@ def _infer_section_type(title: str, content: str, stats: Iterable[str], cta: Opt
         return "call_to_action"
     if stats:
         return "evidence"
-    if any(token in lowered_content for token in ("case study", "search.gov", "cisa", "docusign")):
+    if any(
+        token in lowered_content
+        for token in ("case study", "search.gov", "cisa", "docusign")
+    ):
         return "proof"
     if len(content.split()) < 20:
         return "title"
