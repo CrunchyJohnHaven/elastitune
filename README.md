@@ -1,112 +1,94 @@
 # ElastiTune
 
-Autonomous Elasticsearch search-profile optimizer with a live mission-control dashboard.
+ElastiTune is a live Elasticsearch tuning demo with two modes:
+
+- `Search` mode optimizes relevance for a real index or bundled benchmark.
+- `Committee` mode simulates a buying committee that scores and rewrites proposal documents.
 
 **Live demo:** [elastitune.replit.app](https://elastitune.replit.app/)
 
-![screenshot placeholder](docs/screenshot.png)
+![Architecture diagram](doc-assets/architecture.svg)
 
-## What it does
+## Happy Path
 
-- Connects to any Elasticsearch index (or a built-in benchmark), then runs controlled experiments across field boosts, match strategy, MSM, fuzziness, hybrid weights, and fusion settings.
-- Keeps only changes that improve nDCG@10, producing a measurable before/after lift with full experiment logs.
-- Streams every experiment result in real time over a single WebSocket — no polling, no database.
-- Includes a **Guided Tour** mode: a 10-step walkthrough that explains every stage in plain English, designed for non-technical stakeholders.
-- Includes **Committee Mode**: simulates a buying-committee of personas to score and iteratively rewrite proposal documents.
+1. Open the connect screen.
+2. Click `Launch Demo` for the fastest walkthrough.
+3. Or choose a benchmark preset and tune a real index.
+4. Watch the run screen update in real time.
+5. Open the report and export the result.
 
-> *Elasticsearch is the piano. ElastiTune is the piano tuner.*
+For the short version first, read the [Executive Summary](docs/executive-summary.md). For a presenter-friendly walkthrough, see [docs/demo-narrative.md](docs/demo-narrative.md).
 
-## Quick start
+## Quick Start
 
-**Prerequisites:** Python 3.11+, Node 18+, a running Elasticsearch 8.x instance (or use Docker Compose below).
+Prerequisites: Python 3.11+, Node 18+, and Elasticsearch 8.x.
 
 ```bash
-# 1. Install backend dependencies
-python3 -m venv .venv && source .venv/bin/activate
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r backend/requirements.txt
-
-# 2. Configure environment
-cp .env.example .env          # edit as needed
-
-# 3. Start backend (port 8000)
+cp .env.example .env
 python3 -m uvicorn backend.main:app --reload --port 8000
-
-# 4. Start frontend (port 5173) — in a second terminal
 cd frontend
 npm install
 npm run dev
 ```
 
-Or with Docker Compose (starts Elasticsearch, backend, and frontend together):
+Docker Compose can start the full stack locally:
 
 ```bash
 docker compose up --build
 ```
 
-## Guided Tour
+## Docs
 
-Click **Guided Tour** on the connect screen to launch a 10-step walkthrough that runs a real optimization demo and explains each stage in plain English. Each step pauses with a clear overlay, making it easy to screenshot for executive memos or team presentations.
+- [Local development workflow](docs/CONTRIBUTING.md)
+- [Committee mode overview](docs/committee.md)
+- [API reference](docs/api-reference.md)
+- [Benchmark guide](BENCHMARKS.md)
+- [GitHub research notes](docs/research/github-projects.md)
+- [Task map](CODEX_TASKS.md)
 
-## Architecture
-
-- **Backend:** FastAPI (Python 3.11), Pydantic v2, AsyncElasticsearch, numpy/scipy, orjson. Runs on port 8000.
-- **Frontend:** React 18, TypeScript, Vite, Zustand, Tailwind CSS, HTML5 Canvas, recharts. Dev server on port 5173.
-- **Real-time:** One WebSocket per run, text frames via orjson. No database, no Redis, no task queue — all state is in-memory.
-- **Production:** `npm run build` outputs a static bundle that FastAPI serves directly from `frontend/dist/`.
-
-## Running tests
+## Testing
 
 ```bash
-# Backend unit tests (123 tests across 10 files)
 python3 -m pytest backend/tests/ -v
-
-# Backend smoke test (requires running backend)
 python3 backend/scripts/smoke_app.py
-
-# Frontend type check + build verification
 cd frontend && npx tsc --noEmit && npm run build
 ```
 
 ## Benchmarks
 
-Five benchmark datasets are bundled. Load them all into a local Elasticsearch instance:
-
-```bash
-python3 benchmarks/setup.py          # initial load
-python3 benchmarks/setup.py --reset  # wipe and reload
-```
+Five benchmark datasets are bundled. Use `python3 benchmarks/setup.py` to load them, or `--reset` to wipe and reload.
 
 | Benchmark | Index | Docs | Eval queries |
 |---|---|---:|---:|
 | Product Store | `products-catalog` | 931 | 8 |
-| Books Catalog | `books-catalog` | 999 | 12 |
+| Books Catalog | `books-catalog` | 1,000 | 12 |
 | Workplace Docs | `workplace-docs` | 15 | 16 |
 | Security SIEM | `security-siem` | 301 | 18 |
 | TMDB Movies | `tmdb-movies` | 8,516 | 12 |
 
-## Deploy to Replit
+## Architecture
 
-`replit.nix` and `.replit` are included. Import the repo into Replit, set the environment variables from `.env.example` in the Replit Secrets panel, then run:
+- **Backend:** FastAPI, Pydantic v2, AsyncElasticsearch, SQLite persistence, WebSocket streaming.
+- **Frontend:** React 18, TypeScript, Vite, Zustand, Canvas rendering.
+- **Run services:** `RunManager`, `ESService`, and committee modules coordinate live search and committee flows.
+- **Transport:** one WebSocket per run, with persisted reports available after completion.
+
+## More Docs
+
+- [Executive Summary](docs/executive-summary.md)
+- [Demo narrative](docs/demo-narrative.md)
+- [API reference](docs/api-reference.md)
+- [Committee mode guide](docs/committee.md)
+- [Benchmark guide](BENCHMARKS.md)
+- [Contributor guide](docs/CONTRIBUTING.md)
+
+## Replit
+
+`replit.nix` and `.replit` are included. Import the repo into Replit, set the variables from `.env.example`, and run:
 
 ```bash
 bash setup.sh && bash start.sh
 ```
-
-The backend will bind to `0.0.0.0` on the port Replit assigns; update `CORS_ORIGINS` in Secrets to match your Replit dev URL.
-
-## Related projects
-
-| Project | What it does | Link |
-|---|---|---|
-| **AutoResearch** | Give an AI agent a small but real LLM training setup and let it experiment autonomously overnight. | [github.com/karpathy/autoresearch](https://github.com/karpathy/autoresearch) |
-| **MiroFish** | A simple, universal swarm intelligence engine designed for multi-agent prediction tasks. | [github.com/666ghj/MiroFish](https://github.com/666ghj/MiroFish) |
-
-## Stack
-
-| Layer | Technology |
-|---|---|
-| Backend | FastAPI, Uvicorn, Pydantic v2, AsyncElasticsearch |
-| Frontend | React 18, TypeScript, Vite, Tailwind CSS, Zustand |
-| Visualization | HTML5 Canvas, recharts, framer-motion |
-| Evaluation | nDCG@10 computed in-process with numpy/scipy |
-| Packaging | Docker Compose, Replit |

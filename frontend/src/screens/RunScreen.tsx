@@ -14,6 +14,7 @@ import FishTankCanvas from '@/components/run/FishTankCanvas';
 import RunControlBar from '@/components/run/RunControlBar';
 import WalkthroughOverlay from '@/components/walkthrough/WalkthroughOverlay';
 import ErrorBoundary from '@/components/ui/ErrorBoundary';
+import { SkeletonBlock, SkeletonCard, SkeletonPage } from '@/components/ui/Skeleton';
 
 export default function RunScreen() {
   const { runId } = useParams<{ runId: string }>();
@@ -26,6 +27,43 @@ export default function RunScreen() {
 
   const stage = runSnapshot?.stage ?? 'idle';
   const showExplainer = useAppStore(state => state.showExplainer);
+
+  if (!runSnapshot) {
+    return (
+      <SkeletonPage
+        title="Loading search run"
+        subtitle="The backend is preparing the live telemetry, personas, and optimization workspace."
+      >
+        <div style={{ display: 'grid', gridTemplateColumns: '320px minmax(0, 1fr) 360px', gap: 16 }}>
+          <SkeletonCard minHeight={520}>
+            <SkeletonBlock height={14} width={120} />
+            <div style={{ marginTop: 14 }}>
+              <SkeletonBlock height={10} width="80%" />
+            </div>
+            <div style={{ marginTop: 18, display: 'grid', gap: 10 }}>
+              <SkeletonBlock height={72} />
+              <SkeletonBlock height={72} />
+              <SkeletonBlock height={72} />
+            </div>
+          </SkeletonCard>
+          <SkeletonCard minHeight={520}>
+            <SkeletonBlock height={20} width={180} />
+            <div style={{ marginTop: 18 }}>
+              <SkeletonBlock height={340} radius={18} />
+            </div>
+          </SkeletonCard>
+          <SkeletonCard minHeight={520}>
+            <SkeletonBlock height={14} width={110} />
+            <div style={{ marginTop: 16, display: 'grid', gap: 10 }}>
+              <SkeletonBlock height={84} />
+              <SkeletonBlock height={84} />
+              <SkeletonBlock height={84} />
+            </div>
+          </SkeletonCard>
+        </div>
+      </SkeletonPage>
+    );
+  }
 
   const handleStop = async () => {
     if (!runId) return;

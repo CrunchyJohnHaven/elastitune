@@ -99,9 +99,14 @@ function stableHash(value: string) {
 }
 
 function formatQueriesTested(evalCaseCount: number, experimentsRun: number, baselineScore: number) {
-  if (evalCaseCount <= 0) return '0';
-  const completedPasses = experimentsRun + (baselineScore > 0 ? 1 : 0);
-  return Intl.NumberFormat('en-US').format(evalCaseCount * Math.max(completedPasses, 1));
+  if (evalCaseCount <= 0) {
+    return { tested: '—', total: '—' };
+  }
+  const completedPasses = Math.max(experimentsRun + (baselineScore > 0 ? 1 : 0), 1);
+  return {
+    tested: Intl.NumberFormat('en-US').format(evalCaseCount * completedPasses),
+    total: Intl.NumberFormat('en-US').format(evalCaseCount),
+  };
 }
 
 function compareDepartments(a: string, b: string) {
@@ -212,6 +217,11 @@ export default function FishTankCanvas() {
 
   const personas = runSnapshot?.personas ?? [];
   const experiments = runSnapshot?.experiments ?? [];
+  const queriesTestedSummary = formatQueriesTested(
+    runSnapshot?.summary?.baselineEvalCount ?? 0,
+    runSnapshot?.metrics?.experimentsRun ?? 0,
+    runSnapshot?.metrics?.baselineScore ?? 0,
+  );
 
   useEffect(() => {
     personaLookupRef.current = new Map(personas.map(persona => [persona.id, persona]));
@@ -414,6 +424,7 @@ export default function FishTankCanvas() {
         currentExperimentsRun,
         currentBaselineScore
       );
+      const queriesTestedText = `Queries tested: ${queriesTestedLabel.tested}/${queriesTestedLabel.total}`;
         const { positions, anchors } = buildClusterLayout(
           currentPersonas,
           cx,
@@ -837,10 +848,10 @@ export default function FishTankCanvas() {
         ctx.fillText('ANALYZING', cx, cy + 38);
       } else if (currentStage === 'running') {
         ctx.fillStyle = 'rgba(107,116,128,0.55)';
-        ctx.fillText(`${queriesTestedLabel} queries tested`, cx, cy + 38);
+        ctx.fillText(queriesTestedText, cx, cy + 38);
       } else {
         ctx.fillStyle = 'rgba(107,116,128,0.55)';
-        ctx.fillText(`${currentEvalCaseCount} test queries`, cx, cy + 38);
+        ctx.fillText(`Queries tested: 0/${queriesTestedLabel.total}`, cx, cy + 38);
       }
 
       // Current hypothesis display — appears above the core
@@ -1055,6 +1066,27 @@ export default function FishTankCanvas() {
         onMouseLeave={handleMouseLeave}
         onClick={handleClick}
       />
+      <div
+        title="Queries tested counts the cumulative baseline and candidate passes across the full eval set."
+        style={{
+          position: 'absolute',
+          top: 16,
+          right: 16,
+          zIndex: 4,
+          padding: '7px 10px',
+          borderRadius: 999,
+          background: 'rgba(10,14,20,0.85)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          color: '#EEF3FF',
+          fontFamily: 'Inter, sans-serif',
+          fontSize: 11,
+          lineHeight: 1,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.24)',
+          pointerEvents: 'none',
+        }}
+      >
+        {`Queries tested: ${queriesTestedSummary.tested}/${queriesTestedSummary.total}`}
+      </div>
       <TooltipPortal
         persona={tooltipState.persona}
         x={tooltipState.x}

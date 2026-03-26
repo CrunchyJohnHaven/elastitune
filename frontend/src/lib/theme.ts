@@ -41,3 +41,17 @@ export const ACCENT_CYAN = '#7CE7FF';
 export const SUCCESS = '#4ADE80';
 export const WARNING = '#FBBF24';
 export const DANGER = '#FB7185';
+
+export const FONT_SANS = 'Inter, system-ui, sans-serif';
+export const FONT_MONO = '"JetBrains Mono", ui-monospace, SFMono-Regular, monospace';
+
+export const SURFACE_BASE = '#05070B';
+export const SURFACE_ELEVATED = 'rgba(10,14,20,0.72)';
+export const SURFACE_STRONG = 'rgba(11,15,21,0.96)';
+export const SURFACE_SUBTLE = 'rgba(255,255,255,0.03)';
+
+export const RADIUS_MD = 8;
+export const RADIUS_LG = 12;
+
+export const TRANSITION_FAST = '0.15s ease';
+export const TRANSITION_MEDIUM = '0.22s ease';

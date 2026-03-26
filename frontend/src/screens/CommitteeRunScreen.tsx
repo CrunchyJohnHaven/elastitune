@@ -14,6 +14,7 @@ import { useViewportWidth } from '@/hooks/useViewportWidth';
 import { useCommitteeStore } from '@/store/useCommitteeStore';
 import { api } from '@/lib/api';
 import { formatPercent, formatScore } from '@/lib/format';
+import { SkeletonBlock, SkeletonCard, SkeletonPage } from '@/components/ui/Skeleton';
 
 export default function CommitteeRunScreen() {
   const { runId } = useParams<{ runId: string }>();
@@ -65,6 +66,42 @@ export default function CommitteeRunScreen() {
   const stopDescription = snapshot
     ? `Current consensus is ${formatScore(snapshot.metrics.currentScore)} (${formatPercent(snapshot.metrics.improvementPct)} from baseline). ${snapshot.metrics.rewritesTested}/${Math.max(snapshot.metrics.rewritesTested, 30)} rewrites have run so far.`
     : 'The run will stop and keep the results gathered so far.';
+
+  if (!snapshot) {
+    return (
+      <ErrorBoundary title="Committee Run Failed">
+        <SkeletonPage
+          title="Loading committee run"
+          subtitle="The document is being parsed, personas are being prepared, and the live consensus loop is warming up."
+        >
+          <div style={{ display: 'grid', gridTemplateColumns: '320px minmax(0, 1fr) 360px', gap: 16 }}>
+            <SkeletonCard minHeight={520}>
+              <SkeletonBlock height={14} width={130} />
+              <div style={{ marginTop: 14, display: 'grid', gap: 10 }}>
+                <SkeletonBlock height={78} />
+                <SkeletonBlock height={78} />
+                <SkeletonBlock height={78} />
+              </div>
+            </SkeletonCard>
+            <SkeletonCard minHeight={520}>
+              <SkeletonBlock height={18} width={190} />
+              <div style={{ marginTop: 18 }}>
+                <SkeletonBlock height={350} radius={18} />
+              </div>
+            </SkeletonCard>
+            <SkeletonCard minHeight={520}>
+              <SkeletonBlock height={14} width={120} />
+              <div style={{ marginTop: 14, display: 'grid', gap: 10 }}>
+                <SkeletonBlock height={90} />
+                <SkeletonBlock height={90} />
+                <SkeletonBlock height={90} />
+              </div>
+            </SkeletonCard>
+          </div>
+        </SkeletonPage>
+      </ErrorBoundary>
+    );
+  }
 
   return (
     <ErrorBoundary title="Committee Run Failed">

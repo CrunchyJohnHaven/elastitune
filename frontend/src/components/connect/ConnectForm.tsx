@@ -163,6 +163,7 @@ function StyledInput({
         <button
           type="button"
           onClick={() => setShow(s => !s)}
+          aria-label={show ? 'Hide password' : 'Show password'}
           style={{
             position: 'absolute',
             right: 10,
@@ -176,7 +177,6 @@ function StyledInput({
             display: 'flex',
             alignItems: 'center',
           }}
-          tabIndex={-1}
         >
           {show ? <EyeOff size={14} /> : <Eye size={14} />}
         </button>
@@ -346,7 +346,11 @@ export default function ConnectForm({
       const msg = normalizeErrorMessage(err, 'Could not analyze this search index.');
       // If Elasticsearch isn't running and user clicked "Run Benchmark",
       // silently fall back to demo mode so they still see the app working.
-      if (isBenchmarkAutoRun && msg.includes('Elasticsearch is not responding')) {
+      if (isBenchmarkAutoRun && (
+        msg.includes('Cannot reach the backend') ||
+        msg.includes('temporarily unavailable') ||
+        msg.includes('timed out')
+      )) {
         setIsLoading(false);
         await handleDemo();
       } else {
@@ -438,21 +442,22 @@ export default function ConnectForm({
   return (
     <form onSubmit={handleAnalyze} noValidate>
       {/* Primary CTA buttons — shown at the top for immediate visibility */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
         <button
-          type="submit"
+          type="button"
+          onClick={handleDemo}
           disabled={isLoading}
           style={{
-            flex: 1,
-            padding: '12px',
+            flex: '1 1 180px',
+            padding: '13px 14px',
             background: isLoading
               ? 'rgba(77,163,255,0.35)'
               : 'linear-gradient(135deg, #4DA3FF 0%, #3A8FFF 100%)',
             color: '#fff',
             border: 'none',
-            borderRadius: 8,
+            borderRadius: 10,
             fontFamily: 'Inter, sans-serif',
-            fontWeight: 600,
+            fontWeight: 700,
             fontSize: 13,
             cursor: isLoading ? 'not-allowed' : 'pointer',
             boxShadow: isLoading ? 'none' : '0 0 20px rgba(77,163,255,0.35)',
@@ -479,22 +484,21 @@ export default function ConnectForm({
           }}
         >
           {isLoading && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />}
-          {customFieldsOpen ? 'Analyze Search Index' : 'Run Benchmark'}
+          Launch Demo
         </button>
 
         <button
-          type="button"
-          onClick={handleDemo}
+          type="submit"
           disabled={isLoading}
           style={{
-            flex: 1,
-            padding: '12px',
-            background: 'transparent',
-            color: '#9AA4B2',
-            border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: 8,
+            flex: '1 1 180px',
+            padding: '13px 14px',
+            background: 'rgba(255,255,255,0.03)',
+            color: '#EEF3FF',
+            border: '1px solid rgba(255,255,255,0.11)',
+            borderRadius: 10,
             fontFamily: 'Inter, sans-serif',
-            fontWeight: 500,
+            fontWeight: 600,
             fontSize: 13,
             cursor: isLoading ? 'not-allowed' : 'pointer',
             transition: 'color 0.15s, border-color 0.15s, background 0.15s',
@@ -504,24 +508,24 @@ export default function ConnectForm({
             if (!isLoading) {
               (e.currentTarget as HTMLButtonElement).style.color = '#EEF3FF';
               (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.2)';
-              (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.04)';
+              (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.06)';
             }
           }}
           onMouseLeave={e => {
             if (!isLoading) {
-              (e.currentTarget as HTMLButtonElement).style.color = '#9AA4B2';
+              (e.currentTarget as HTMLButtonElement).style.color = '#EEF3FF';
               (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.1)';
-              (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
+              (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.03)';
             }
           }}
         >
-          Launch Demo
+          {customFieldsOpen ? 'Analyze Search Index' : 'Run Benchmark'}
         </button>
       </div>
 
-      <button
-        type="button"
-        onClick={handleGuidedTour}
+        <button
+          type="button"
+          onClick={handleGuidedTour}
         disabled={isLoading}
         style={{
           width: '100%',
@@ -754,6 +758,7 @@ export default function ConnectForm({
         <button
           type="button"
           onClick={() => setCustomOpen(o => !o)}
+          aria-expanded={customFieldsOpen}
           style={{
             width: '100%',
             display: 'flex',
@@ -953,6 +958,7 @@ export default function ConnectForm({
                   type="file"
                   accept=".json,application/json"
                   style={{ display: 'none' }}
+                  aria-label="Upload test search JSON"
                   onChange={e => {
                     void handleEvalUpload(e.target.files?.[0] ?? null);
                     e.currentTarget.value = '';
@@ -993,6 +999,7 @@ export default function ConnectForm({
         <button
           type="button"
           onClick={() => setAdvancedOpen(o => !o)}
+          aria-expanded={advancedOpen}
           style={{
             width: '100%',
             display: 'flex',

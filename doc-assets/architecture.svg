@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720" role="img" aria-labelledby="title desc">
+  <title id="title">ElastiTune architecture diagram</title>
+  <desc id="desc">Frontend pages connect to backend services over REST and WebSocket. Search runs use RunManager and ESService. Committee runs use committee modules and the shared WebSocket stream.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#05070B"/>
+      <stop offset="100%" stop-color="#0A0E14"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" x2="1">
+      <stop offset="0%" stop-color="#4DA3FF"/>
+      <stop offset="100%" stop-color="#7CE7FF"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7CE7FF"/>
+    </marker>
+    <style>
+      .box { fill: rgba(10,14,20,0.88); stroke: rgba(255,255,255,0.14); stroke-width: 2; rx: 18; ry: 18; }
+      .lane { fill: rgba(255,255,255,0.03); stroke: rgba(255,255,255,0.08); stroke-width: 1; rx: 22; ry: 22; }
+      .title { fill: #EEF3FF; font: 700 30px Inter, Arial, sans-serif; }
+      .label { fill: #9AA4B2; font: 600 18px "JetBrains Mono", monospace; letter-spacing: 0.12em; }
+      .text { fill: #C5CDD8; font: 16px Inter, Arial, sans-serif; }
+      .small { fill: #9AA4B2; font: 14px Inter, Arial, sans-serif; }
+      .accent { fill: #4DA3FF; }
+    </style>
+  </defs>
+
+  <rect width="1200" height="720" fill="url(#bg)"/>
+
+  <text x="48" y="58" class="title">ElastiTune system flow</text>
+  <text x="48" y="92" class="small">Search and committee modes share the same run transport, persistence, and report surfaces.</text>
+
+  <rect x="36" y="128" width="1128" height="250" class="lane"/>
+  <text x="60" y="164" class="label">FRONTEND</text>
+
+  <rect x="80" y="190" width="210" height="118" class="box"/>
+  <text x="108" y="224" class="text">ConnectScreen</text>
+  <text x="108" y="252" class="small">Launch Demo</text>
+  <text x="108" y="274" class="small">Benchmark / live connect</text>
+
+  <rect x="330" y="190" width="210" height="118" class="box"/>
+  <text x="358" y="224" class="text">RunScreen</text>
+  <text x="358" y="252" class="small">TopTelemetryBar</text>
+  <text x="358" y="274" class="small">FishTankCanvas + rails</text>
+
+  <rect x="580" y="190" width="210" height="118" class="box"/>
+  <text x="608" y="224" class="text">CommitteeRunScreen</text>
+  <text x="608" y="252" class="small">CommitteeTopBar</text>
+  <text x="608" y="274" class="small">CommitteeSpaceCanvas</text>
+
+  <rect x="830" y="190" width="210" height="118" class="box"/>
+  <text x="858" y="224" class="text">ReportScreen</text>
+  <text x="858" y="252" class="small">ExecutiveSummary</text>
+  <text x="858" y="274" class="small">Export, compare, continue</text>
+
+  <rect x="36" y="412" width="1128" height="270" class="lane"/>
+  <text x="60" y="448" class="label">BACKEND</text>
+
+  <rect x="82" y="476" width="210" height="118" class="box"/>
+  <text x="110" y="510" class="text">FastAPI routes</text>
+  <text x="110" y="538" class="small">/api/connect</text>
+  <text x="110" y="560" class="small">/api/runs</text>
+
+  <rect x="336" y="476" width="210" height="118" class="box"/>
+  <text x="364" y="510" class="text">RunManager</text>
+  <text x="364" y="538" class="small">Pub/sub and snapshots</text>
+  <text x="364" y="560" class="small">Persistence bridge</text>
+
+  <rect x="590" y="476" width="210" height="118" class="box"/>
+  <text x="618" y="510" class="text">ESService</text>
+  <text x="618" y="538" class="small">Index analysis</text>
+  <text x="618" y="560" class="small">Search evaluation</text>
+
+  <rect x="844" y="476" width="210" height="118" class="box"/>
+  <text x="872" y="510" class="text">Committee modules</text>
+  <text x="872" y="538" class="small">personas.py</text>
+  <text x="872" y="560" class="small">evaluator.py / reporting.py</text>
+
+  <line x1="290" y1="249" x2="330" y2="249" stroke="url(#accent)" stroke-width="4" marker-end="url(#arrow)"/>
+  <line x1="540" y1="249" x2="580" y2="249" stroke="url(#accent)" stroke-width="4" marker-end="url(#arrow)"/>
+  <line x1="790" y1="249" x2="830" y2="249" stroke="url(#accent)" stroke-width="4" marker-end="url(#arrow)"/>
+
+  <line x1="187" y1="308" x2="187" y2="476" stroke="rgba(124,231,255,0.75)" stroke-width="4" marker-end="url(#arrow)"/>
+  <line x1="441" y1="308" x2="441" y2="476" stroke="rgba(124,231,255,0.75)" stroke-width="4" marker-end="url(#arrow)"/>
+  <line x1="695" y1="308" x2="695" y2="476" stroke="rgba(124,231,255,0.75)" stroke-width="4" marker-end="url(#arrow)"/>
+  <line x1="949" y1="308" x2="949" y2="476" stroke="rgba(124,231,255,0.75)" stroke-width="4" marker-end="url(#arrow)"/>
+
+  <text x="322" y="350" class="small">REST + JSON</text>
+  <text x="600" y="350" class="small">WebSocket /ws/runs/{runId}</text>
+  <text x="860" y="350" class="small">persisted reports</text>
+</svg>

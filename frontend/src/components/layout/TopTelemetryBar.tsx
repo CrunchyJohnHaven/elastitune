@@ -2,12 +2,23 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAppStore } from '@/store/useAppStore';
 import { formatScore, formatPercent, formatDuration, formatDollars, truncate, getDisplayElapsedSeconds } from '@/lib/format';
-import { PANEL_BORDER, ACCENT_BLUE, TEXT_SECONDARY, TEXT_DIM } from '@/lib/theme';
+import {
+  PANEL_BORDER,
+  ACCENT_BLUE,
+  TEXT_SECONDARY,
+  TEXT_DIM,
+  FONT_SANS,
+  FONT_MONO,
+  SURFACE_STRONG,
+} from '@/lib/theme';
 
 function formatQueriesTested(evalCaseCount: number, experimentsRun: number, baselineScore: number) {
-  if (evalCaseCount <= 0) return '—';
-  const completedPasses = experimentsRun + (baselineScore > 0 ? 1 : 0);
-  return Intl.NumberFormat('en-US').format(evalCaseCount * Math.max(completedPasses, 1));
+  if (evalCaseCount <= 0) return { tested: '—', total: '—' };
+  const completedPasses = Math.max(experimentsRun + (baselineScore > 0 ? 1 : 0), 1);
+  return {
+    tested: Intl.NumberFormat('en-US').format(evalCaseCount * completedPasses),
+    total: Intl.NumberFormat('en-US').format(evalCaseCount),
+  };
 }
 
 function HowItWorksButton() {
@@ -20,6 +31,7 @@ function HowItWorksButton() {
       onClick={toggleExplainer}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      aria-label={showExplainer ? 'Return to the live run view' : 'Open the explainer panel'}
       title="How does this work?"
       style={{
         display: 'flex',
@@ -79,14 +91,17 @@ function TelemetryBlock({
   value,
   valueStyle,
   dimmed,
+  title,
 }: {
   label: string;
   value: string;
   valueStyle?: React.CSSProperties;
   dimmed?: boolean;
+  title?: string;
 }) {
   return (
     <div
+      title={title}
       style={{
         display: 'flex',
         flexDirection: 'column',
@@ -100,7 +115,7 @@ function TelemetryBlock({
     >
       <span
         style={{
-          fontFamily: 'JetBrains Mono, monospace',
+          fontFamily: FONT_MONO,
           fontSize: 9,
           fontWeight: 600,
           letterSpacing: '0.12em',
@@ -112,7 +127,7 @@ function TelemetryBlock({
       </span>
       <span
         style={{
-          fontFamily: 'JetBrains Mono, monospace',
+          fontFamily: FONT_MONO,
           fontSize: 16,
           fontWeight: 500,
           color: dimmed ? TEXT_DIM : '#EEF3FF',
@@ -219,18 +234,34 @@ export default function TopTelemetryBar() {
     metrics?.projectedMonthlySavingsUsd != null
       ? formatDollars(metrics.projectedMonthlySavingsUsd)
       : '—';
-  const elapsedSeconds = metrics
-    ? getDisplayElapsedSeconds({
-      metricsElapsedSeconds: metrics.elapsedSeconds,
-      startedAt,
-      completedAt,
-      stage,
-    })
-    : 0;
+  const elapsedSeconds = (() => {
+    if (!metrics) return 0;
+    if (stage === 'completed' || stage === 'error' || !startedAt) {
+      return getDisplayElapsedSeconds({
+        metricsElapsedSeconds: metrics.elapsedSeconds,
+        startedAt,
+        completedAt,
+        stage,
+      });
+    }
+    const started = new Date(startedAt).getTime();
+    if (Number.isNaN(started)) {
+      return getDisplayElapsedSeconds({
+        metricsElapsedSeconds: metrics.elapsedSeconds,
+        startedAt,
+        completedAt,
+        stage,
+      });
+    }
+    return Math.max(metrics.elapsedSeconds, (Date.now() - started) / 1000);
+  })();
   const elapsed = metrics ? formatDuration(elapsedSeconds) : '—';
   const queriesTested = summary && metrics
     ? formatQueriesTested(summary.baselineEvalCount, totalRun, metrics.baselineScore)
-    : '—';
+    : { tested: '—', total: '—' };
+  const queriesTitle = summary
+    ? `Queries tested counts all completed baseline/candidate passes. ${queriesTested.tested} total tests across ${queriesTested.total} eval cases.`
+    : 'Queries tested counts all completed baseline/candidate passes.';
   const clusterName = summary?.clusterName ? truncate(summary.clusterName, 18) : '—';
   const eta = metrics && runConfig
     ? (() => {
@@ -266,7 +297,7 @@ export default function TopTelemetryBar() {
           flexShrink: 0,
           display: 'flex',
           alignItems: 'stretch',
-          background: 'rgba(11,15,21,0.95)',
+          background: SURFACE_STRONG,
           borderBottom: `1px solid ${PANEL_BORDER}`,
           backdropFilter: 'blur(12px)',
           zIndex: 100,
@@ -289,6 +320,7 @@ export default function TopTelemetryBar() {
           onMouseEnter={e => ((e.currentTarget as HTMLAnchorElement).style.opacity = '0.75')}
           onMouseLeave={e => ((e.currentTarget as HTMLAnchorElement).style.opacity = '1')}
           title="Back to Dashboard"
+          aria-label="Back to dashboard"
         >
           <div
             style={{
@@ -301,7 +333,7 @@ export default function TopTelemetryBar() {
           />
           <span
             style={{
-              fontFamily: 'Inter, sans-serif',
+              fontFamily: FONT_SANS,
               fontWeight: 700,
               fontSize: 13,
               color: '#EEF3FF',
@@ -318,7 +350,11 @@ export default function TopTelemetryBar() {
           valueStyle={{ color: mode === 'demo' ? '#FBBF24' : '#4ADE80', fontSize: 13 }}
         />
         <TelemetryBlock label="CLUSTER" value={clusterName} />
-        <TelemetryBlock label="QUERIES TESTED" value={queriesTested} />
+        <TelemetryBlock
+          label="QUERIES TESTED"
+          value={`${queriesTested.tested}/${queriesTested.total}`}
+          title={queriesTitle}
+        />
         <TelemetryBlock
           label="nDCG@10"
           value={ndcgValue}
@@ -328,7 +364,7 @@ export default function TopTelemetryBar() {
             fontSize: 18,
           }}
         />
-        <TelemetryBlock label="KEPT / RUN" value={keptRun} />
+        <TelemetryBlock label="KEPT / RUN" value={keptRun} title="Cumulative improvements kept versus total experiments run." />
         <TelemetryBlock label="PERSONA WIN%" value={winPct} />
         <TelemetryBlock
           label="GAIN"
@@ -344,8 +380,8 @@ export default function TopTelemetryBar() {
           }
           dimmed={(!metrics?.improvementPct || metrics.improvementPct === 0) && savings === '—'}
         />
-        <TelemetryBlock label="ELAPSED" value={elapsed} />
-        <TelemetryBlock label="ETA" value={eta} dimmed={eta === '—'} />
+        <TelemetryBlock label="ELAPSED" value={elapsed} title="Elapsed time since the run started." />
+        <TelemetryBlock label="ETA" value={eta} dimmed={eta === '—'} title="Estimated time remaining for the active run." />
 
         <div style={{ flex: 1 }} />
 

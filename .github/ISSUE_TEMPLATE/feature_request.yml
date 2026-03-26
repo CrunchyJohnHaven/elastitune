@@ -1,0 +1,29 @@
+name: Feature request
+description: Suggest a new capability or product improvement
+labels: [enhancement]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What would you like to add or improve?
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it matters
+      description: Explain the user value or business value.
+    validations:
+      required: true
+  - type: textarea
+    id: approach
+    attributes:
+      label: Suggested approach
+      description: Optional implementation ideas or constraints.
+  - type: input
+    id: mode
+    attributes:
+      label: Affected mode
+      description: Search, committee, demo, or all three.
+

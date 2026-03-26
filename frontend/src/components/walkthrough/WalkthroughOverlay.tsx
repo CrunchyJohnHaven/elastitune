@@ -96,6 +96,7 @@ export default function WalkthroughOverlay() {
             {/* Close button */}
             <button
               onClick={stopWalkthrough}
+              aria-label="Exit walkthrough"
               style={{
                 background: 'none',
                 border: 'none',
@@ -106,10 +107,10 @@ export default function WalkthroughOverlay() {
                 lineHeight: 1,
               }}
               title="Exit walkthrough"
-            >
-              ✕
-            </button>
-          </div>
+              >
+                ✕
+              </button>
+            </div>
 
           {/* Title */}
           <motion.h3
@@ -158,6 +159,7 @@ export default function WalkthroughOverlay() {
             <button
               onClick={prevStep}
               disabled={isFirst}
+              aria-label="Previous walkthrough step"
               style={{
                 fontFamily: 'Inter, sans-serif',
                 fontSize: 13,
@@ -170,8 +172,27 @@ export default function WalkthroughOverlay() {
                 cursor: isFirst ? 'default' : 'pointer',
                 transition: 'color 0.2s',
               }}
-            >
+              >
               Back
+            </button>
+
+            <button
+              onClick={stopWalkthrough}
+              aria-label="Skip walkthrough"
+              style={{
+                fontFamily: 'Inter, sans-serif',
+                fontSize: 13,
+                fontWeight: 500,
+                color: '#9AA4B2',
+                background: 'rgba(255, 255, 255, 0.02)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: 8,
+                padding: '8px 14px',
+                cursor: 'pointer',
+                transition: 'color 0.2s, background 0.2s',
+              }}
+            >
+              Skip Tour
             </button>
 
             <div
@@ -202,6 +223,7 @@ export default function WalkthroughOverlay() {
             {isLast ? (
               <button
                 onClick={stopWalkthrough}
+                aria-label="Finish walkthrough"
                 style={{
                   fontFamily: 'Inter, sans-serif',
                   fontSize: 13,
@@ -219,6 +241,7 @@ export default function WalkthroughOverlay() {
             ) : (
               <button
                 onClick={nextStep}
+                aria-label="Next walkthrough step"
                 style={{
                   fontFamily: 'Inter, sans-serif',
                   fontSize: 13,

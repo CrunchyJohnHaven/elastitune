@@ -11,6 +11,76 @@ import type {
 const BASE = '/api';
 const DEFAULT_TIMEOUT_MS = 30_000;
 
+function friendlyStatusMessage(status: number, detail?: string): string {
+  const normalizedDetail = detail?.trim();
+  switch (status) {
+    case 400:
+      return normalizedDetail || 'The request was rejected by the backend.';
+    case 401:
+    case 403:
+      return 'Invalid credentials or insufficient permissions for that Elasticsearch cluster.';
+    case 404:
+      return normalizedDetail || 'The requested resource was not found.';
+    case 408:
+      return 'The backend took too long to respond.';
+    case 409:
+      return normalizedDetail || 'The requested action cannot be completed yet.';
+    case 422:
+      return normalizedDetail || 'One or more request fields were invalid.';
+    case 429:
+      return 'Too many requests were sent to the backend. Please try again shortly.';
+    case 500:
+      return 'The backend encountered an internal error.';
+    case 502:
+    case 503:
+      return 'The backend is temporarily unavailable.';
+    default:
+      return normalizedDetail || `Request failed with HTTP ${status}.`;
+  }
+}
+
+async function readErrorBody(res: Response): Promise<string | undefined> {
+  const contentType = res.headers.get('content-type') ?? '';
+  try {
+    const text = await res.text();
+    if (contentType.includes('application/json')) {
+      const payload = JSON.parse(text) as unknown;
+      if (typeof payload === 'string') return payload;
+      if (payload && typeof payload === 'object') {
+        const data = payload as { detail?: unknown; message?: unknown; error?: unknown };
+        const value = data.detail ?? data.message ?? data.error;
+        if (typeof value === 'string') return value;
+        if (Array.isArray(value)) {
+          return value
+            .map(item => {
+              if (typeof item === 'string') return item;
+              if (item && typeof item === 'object' && 'msg' in item) {
+                return String((item as { msg?: unknown }).msg ?? '');
+              }
+              return '';
+            })
+            .filter(Boolean)
+            .join('; ');
+        }
+      }
+    }
+    return text.trim() || undefined;
+  } catch {
+    // Ignore unreadable error bodies.
+    return undefined;
+  }
+}
+
+function normalizeNetworkError(error: unknown): Error {
+  if (error instanceof DOMException && error.name === 'AbortError') {
+    return new Error('Request timed out. Check that the backend is running and responsive.');
+  }
+  if (error instanceof TypeError) {
+    return new Error('Cannot reach the backend. Make sure the API server is running.');
+  }
+  return error instanceof Error ? error : new Error('Unknown request error');
+}
+
 async function request<T>(path: string, options?: RequestInit & { timeoutMs?: number }): Promise<T> {
   const { timeoutMs = DEFAULT_TIMEOUT_MS, ...fetchOpts } = options ?? {};
   const controller = new AbortController();
@@ -24,19 +94,13 @@ async function request<T>(path: string, options?: RequestInit & { timeoutMs?: nu
       ...fetchOpts,
     });
   } catch (error) {
-    if (error instanceof DOMException && error.name === 'AbortError') {
-      throw new Error('Request timed out. Check that the backend is running and responsive.');
-    }
-    if (error instanceof TypeError) {
-      throw new Error('Cannot reach the ElastiTune backend. Make sure the API server is running.');
-    }
-    throw error;
+    throw normalizeNetworkError(error);
   } finally {
     clearTimeout(timer);
   }
   if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`HTTP ${res.status}: ${body}`);
+    const detail = await readErrorBody(res);
+    throw new Error(friendlyStatusMessage(res.status, detail));
   }
   return res.json();
 }
@@ -128,8 +192,8 @@ export const api = {
       body: form,
     });
     if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`HTTP ${res.status}: ${body}`);
+      const detail = await readErrorBody(res);
+      throw new Error(friendlyStatusMessage(res.status, detail));
     }
     return res.json() as Promise<CommitteeConnectionResponse>;
   },
@@ -182,7 +246,10 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ connectionId, modelIds, maxExperimentsPerModel }),
     });
-    if (!res.ok) throw new Error(await res.text());
+    if (!res.ok) {
+      const detail = await readErrorBody(res);
+      throw new Error(friendlyStatusMessage(res.status, detail));
+    }
     return res.json();
   },
 };

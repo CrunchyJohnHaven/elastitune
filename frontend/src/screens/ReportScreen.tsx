@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Printer, Copy, ArrowLeft, Loader2, Download, RefreshCw, RotateCcw } from 'lucide-react';
+import { Printer, Copy, ArrowLeft, Download, RefreshCw, RotateCcw } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { useToast } from '@/components/ui/ToastProvider';
 import { api } from '@/lib/api';
@@ -16,6 +16,7 @@ import ExperimentTable from '@/components/report/ExperimentTable';
 import { PANEL_BORDER, ACCENT_BLUE } from '@/lib/theme';
 import { buildShareableReportHtml } from '@/lib/reportExport';
 import WalkthroughOverlay from '@/components/walkthrough/WalkthroughOverlay';
+import { SkeletonBlock, SkeletonCard, SkeletonPage } from '@/components/ui/Skeleton';
 
 export default function ReportScreen() {
   const { runId } = useParams<{ runId: string }>();
@@ -276,33 +277,46 @@ export default function ReportScreen() {
 
   if (loading) {
     return (
-      <div
-        style={{
-          width: '100vw',
-          height: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: '#05070B',
-          flexDirection: 'column',
-          gap: 14,
-        }}
+      <SkeletonPage
+        title="Loading report"
+        subtitle="The executive summary, score timeline, and export-ready details are being assembled."
       >
-        <Loader2
-          size={28}
-          style={{ color: ACCENT_BLUE, animation: 'spin 1s linear infinite' }}
-        />
-        <span
-          style={{
-            fontFamily: 'Inter, sans-serif',
-            fontSize: 13,
-            color: '#6B7480',
-          }}
-        >
-          Loading report…
-        </span>
-        <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
-      </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12, marginBottom: 18 }}>
+          {Array.from({ length: 4 }).map((_, index) => (
+            <SkeletonCard key={index} minHeight={96}>
+              <SkeletonBlock height={10} width={92} />
+              <div style={{ marginTop: 12 }}>
+                <SkeletonBlock height={26} width={128} />
+              </div>
+            </SkeletonCard>
+          ))}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1.08fr 0.92fr', gap: 18 }}>
+          <SkeletonCard minHeight={420}>
+            <SkeletonBlock height={12} width={160} />
+            <div style={{ marginTop: 14 }}>
+              <SkeletonBlock height={360} radius={14} />
+            </div>
+          </SkeletonCard>
+          <div style={{ display: 'grid', gap: 18 }}>
+            <SkeletonCard minHeight={190}>
+              <SkeletonBlock height={12} width={120} />
+              <div style={{ marginTop: 14, display: 'grid', gap: 10 }}>
+                <SkeletonBlock height={16} />
+                <SkeletonBlock height={16} />
+                <SkeletonBlock height={16} width="78%" />
+              </div>
+            </SkeletonCard>
+            <SkeletonCard minHeight={190}>
+              <SkeletonBlock height={12} width={140} />
+              <div style={{ marginTop: 14, display: 'grid', gap: 10 }}>
+                <SkeletonBlock height={70} />
+                <SkeletonBlock height={70} />
+              </div>
+            </SkeletonCard>
+          </div>
+        </div>
+      </SkeletonPage>
     );
   }
 

@@ -1,0 +1,24 @@
+name: Documentation improvement
+description: Improve onboarding, docs, or references
+labels: [documentation]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What documentation should change?
+    validations:
+      required: true
+  - type: textarea
+    id: gap
+    attributes:
+      label: What is confusing or missing?
+      description: Point to the section that should be clearer.
+    validations:
+      required: true
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested wording or structure
+      description: Optional draft text or outline.
+

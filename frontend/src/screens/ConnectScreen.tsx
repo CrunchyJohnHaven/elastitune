@@ -180,7 +180,7 @@ export default function ConnectScreen() {
               letterSpacing: '0.04em',
             }}
           >
-            Find weak search results, test fixes automatically, and leave with a before/after report.
+            Launch the demo, or tune a real index with a few guided fields.
           </p>
 
           <div
@@ -193,7 +193,7 @@ export default function ConnectScreen() {
               maxWidth: 520,
             }}
           >
-            ElastiTune watches how different people would search your system, tries ranking changes for you, and keeps only the ones that improve results.
+            ElastiTune watches how different people would search your system, tests ranking changes, and keeps only the ones that improve results.
           </div>
 
           <div
@@ -214,7 +214,7 @@ export default function ConnectScreen() {
                 marginBottom: 5,
               }}
             >
-              Easiest path
+              Quick path
             </div>
             <div
               style={{
@@ -224,9 +224,9 @@ export default function ConnectScreen() {
                 lineHeight: 1.5,
               }}
             >
-              Use one of these two first steps:
+              Use one of these two steps:
               <br />
-              1. Click <span style={{ color: '#EEF3FF' }}>Launch Demo</span> if you just want to watch it work.
+              1. Click <span style={{ color: '#EEF3FF' }}>Launch Demo</span> to see the happy path.
               <br />
               2. Click <span style={{ color: '#EEF3FF' }}>Use benchmark preset</span> if you want a real local benchmark with a fixed test set.
             </div>
@@ -366,4 +366,3 @@ export default function ConnectScreen() {
     </div>
   );
 }
-

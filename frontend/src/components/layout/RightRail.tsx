@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import IndexSummaryMiniCard from '@/components/run/IndexSummaryMiniCard';
 import PersonaList from '@/components/run/PersonaList';
@@ -6,7 +6,7 @@ import PersonaDetailCard from '@/components/run/PersonaDetailCard';
 import CompressionCard from '@/components/run/CompressionCard';
 import HeroMetrics from '@/components/run/HeroMetrics';
 import type { PersonaActivityEntry, PersonaViewModel } from '@/types/contracts';
-import { PANEL_BORDER, PANEL_BG } from '@/lib/theme';
+import { PANEL_BORDER, PANEL_BG, FONT_MONO, TEXT_DIM } from '@/lib/theme';
 
 const EMPTY_PERSONAS: PersonaViewModel[] = [];
 const EMPTY_ACTIVITY: PersonaActivityEntry[] = [];
@@ -31,9 +31,9 @@ function PostureStat({
     >
       <div
         style={{
-          fontFamily: 'JetBrains Mono, monospace',
+          fontFamily: FONT_MONO,
           fontSize: 9,
-          color: '#6B7480',
+          color: TEXT_DIM,
           textTransform: 'uppercase',
           letterSpacing: '0.08em',
           marginBottom: 4,
@@ -43,7 +43,7 @@ function PostureStat({
       </div>
       <div
         style={{
-          fontFamily: 'JetBrains Mono, monospace',
+          fontFamily: FONT_MONO,
           fontSize: 14,
           fontWeight: 600,
           color: color ?? '#EEF3FF',
@@ -66,12 +66,12 @@ function SectionHeader({ children }: { children: React.ReactNode }) {
     >
       <span
         style={{
-          fontFamily: 'JetBrains Mono, monospace',
+          fontFamily: FONT_MONO,
           fontSize: 10,
           fontWeight: 600,
           letterSpacing: '0.14em',
           textTransform: 'uppercase',
-          color: '#6B7480',
+          color: TEXT_DIM,
         }}
       >
         {children}
@@ -81,6 +81,7 @@ function SectionHeader({ children }: { children: React.ReactNode }) {
 }
 
 export default function RightRail() {
+  const runId = useAppStore(state => state.runSnapshot?.runId ?? null);
   const summary = useAppStore(state => state.runSnapshot?.summary);
   const metrics = useAppStore(state => state.runSnapshot?.metrics);
   const mode = useAppStore(state => state.runSnapshot?.mode ?? 'demo');
@@ -94,6 +95,31 @@ export default function RightRail() {
   const selectedPersonaId = useAppStore(state => state.selectedPersonaId);
   const personaActivityById = useAppStore(state => state.personaActivityById);
   const setSelectedPersona = useAppStore(state => state.setSelectedPersona);
+  const cumulativeCountsRef = useRef({ runId: null as string | null, resolved: 0, missed: 0 });
+
+  const currentResolvedCount = personas.reduce(
+    (sum, persona) => sum + persona.successes + persona.partials,
+    0
+  );
+  const currentMissedCount = personas.reduce((sum, persona) => sum + persona.failures, 0);
+
+  useEffect(() => {
+    if (!runId) return;
+    if (cumulativeCountsRef.current.runId !== runId) {
+      cumulativeCountsRef.current = {
+        runId,
+        resolved: currentResolvedCount,
+        missed: currentMissedCount,
+      };
+      return;
+    }
+
+    cumulativeCountsRef.current = {
+      runId,
+      resolved: Math.max(cumulativeCountsRef.current.resolved, currentResolvedCount),
+      missed: Math.max(cumulativeCountsRef.current.missed, currentMissedCount),
+    };
+  }, [runId, currentResolvedCount, currentMissedCount]);
 
   if (!summary || !metrics || !searchProfile || !recommendedProfile || !compression) {
     return (
@@ -149,11 +175,8 @@ export default function RightRail() {
   // Persona state transitions happen instantly in backend batch, so 'searching' is never seen.
   // Count personas as "active" if they have non-idle state (recently searched).
   const activeCount = personas.filter(persona => persona.state !== 'idle' && persona.totalSearches > 0).length;
-  const resolvedCount = personas.reduce(
-    (sum, persona) => sum + persona.successes + persona.partials,
-    0
-  );
-  const missedCount = personas.reduce((sum, persona) => sum + persona.failures, 0);
+  const resolvedCount = Math.max(currentResolvedCount, cumulativeCountsRef.current.resolved);
+  const missedCount = Math.max(currentMissedCount, cumulativeCountsRef.current.missed);
   const topDepartment = Object.entries(
     personas.reduce<Record<string, number>>((acc, persona) => {
       acc[persona.department] = (acc[persona.department] ?? 0) + 1;
