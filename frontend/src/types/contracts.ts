@@ -97,24 +97,6 @@ export interface SearchProfile {
   rrfRankConstant: number;
   knnK: number;
   numCandidates: number;
-  modelId?: string | null;  // ES model_id for query_vector_builder
-}
-
-export interface ModelComparisonEntry {
-  modelId: string;
-  baselineScore: number;
-  bestScore: number;
-  improvementPct: number;
-  experimentsRun: number;
-  improvementsKept: number;
-  bestProfile: SearchProfile;
-  topChanges: string[];
-}
-
-export interface ModelComparisonResult {
-  entries: ModelComparisonEntry[];
-  recommendedModel: string | null;
-  comparisonNote: string;
 }
 
 export interface SearchProfileChange {
@@ -228,7 +210,6 @@ export interface RunConfig {
   maxExperiments: number;
   personaCount: number;
   autoStopOnPlateau: boolean;
-  optimizerStrategy?: 'heuristic' | 'adaptive_evolutionary';
 }
 
 export interface RunSnapshot {
@@ -281,65 +262,6 @@ export interface PersonaImpactRow {
   deltaPct: number;
 }
 
-export interface ReportNarrativeSection {
-  key: string;
-  title: string;
-  body: string;
-  audience?: 'executive' | 'operator' | 'technical';
-  source?: 'deterministic' | 'llm';
-  confidence?: number | null;
-}
-
-export interface ReportPersonaSummary {
-  personaCount: number;
-  archetypeCounts: Record<string, number>;
-  topRoles: string[];
-  explanation: string;
-}
-
-export interface ReportValidationNote {
-  title: string;
-  body: string;
-  severity: 'success' | 'info' | 'warning';
-  confidence?: number | null;
-}
-
-export interface ReportSnippetLine {
-  lineNumber: number;
-  content: string;
-  changed?: boolean;
-  explanation?: string | null;
-}
-
-export interface ReportCodeSnippet {
-  title: string;
-  target: string;
-  format: string;
-  summary: string;
-  beforeLines: ReportSnippetLine[];
-  afterLines: ReportSnippetLine[];
-}
-
-export interface ReportChangeNarrative {
-  path: string;
-  title: string;
-  plainEnglish: string;
-  before: string;
-  after: string;
-  expectedEffect: string;
-  whyItHelped: string;
-  confidence?: number | null;
-  evidence: string[];
-}
-
-export interface ReportImplementationGuide {
-  summary: string;
-  applyInstructions: string[];
-  representativeQuery?: string | null;
-  note?: string | null;
-  snippets: ReportCodeSnippet[];
-}
-
 export interface ReportPayload {
   runId: string;
   generatedAt: string;
@@ -355,22 +277,12 @@ export interface ReportPayload {
     improvementsKept: number;
     durationSeconds: number;
     projectedMonthlySavingsUsd?: number | null;
-    modelId?: string | null;
-    confidenceScore?: number | null;
-    personaCount?: number | null;
-    queriesImproved?: number | null;
-    queriesRegressed?: number | null;
     // Continuation tracking
     isContinuation?: boolean;
     originalBaselineScore?: number | null;
     totalExperimentsRun?: number | null;
     totalImprovementsKept?: number | null;
   };
-  narrative?: ReportNarrativeSection[];
-  personaSummary?: ReportPersonaSummary | null;
-  validationNotes?: ReportValidationNote[];
-  changeNarratives?: ReportChangeNarrative[];
-  implementationGuide?: ReportImplementationGuide | null;
   connection: ConnectionSummary;
   connectionConfig?: {
     mode: RunMode;
@@ -447,3 +359,80 @@ export type RunSocketEvent =
   | { type: 'compression.updated'; payload: CompressionSummary }
   | { type: 'report.ready'; payload: ReportPayload }
   | { type: 'error'; payload: { code: string; message: string } };
+
+// ── Codex branch additions ─────────────────────────────────────────────────
+export interface ModelComparisonEntry {
+  modelId: string;
+  baselineScore: number;
+  bestScore: number;
+  improvementPct: number;
+  experimentsRun: number;
+  improvementsKept: number;
+  bestProfile: SearchProfile;
+  topChanges: string[];
+}
+
+export interface ModelComparisonResult {
+  entries: ModelComparisonEntry[];
+  recommendedModel: string | null;
+  comparisonNote: string;
+}
+
+export interface ReportNarrativeSection {
+  key: string;
+  title: string;
+  body: string;
+  audience?: 'executive' | 'operator' | 'technical';
+  source?: 'deterministic' | 'llm';
+  confidence?: number | null;
+}
+
+export interface ReportPersonaSummary {
+  personaCount: number;
+  archetypeCounts: Record<string, number>;
+  topRoles: string[];
+  explanation: string;
+}
+
+export interface ReportValidationNote {
+  title: string;
+  body: string;
+  severity: 'success' | 'info' | 'warning';
+  confidence?: number | null;
+}
+
+export interface ReportSnippetLine {
+  lineNumber: number;
+  content: string;
+  changed?: boolean;
+  explanation?: string | null;
+}
+
+export interface ReportCodeSnippet {
+  title: string;
+  target: string;
+  format: string;
+  summary: string;
+  beforeLines: ReportSnippetLine[];
+  afterLines: ReportSnippetLine[];
+}
+
+export interface ReportChangeNarrative {
+  path: string;
+  title: string;
+  plainEnglish: string;
+  before: string;
+  after: string;
+  expectedEffect: string;
+  whyItHelped: string;
+  confidence?: number | null;
+  evidence: string[];
+}
+
+export interface ReportImplementationGuide {
+  summary: string;
+  applyInstructions: string[];
+  representativeQuery?: string | null;
+  note?: string | null;
+  snippets: ReportCodeSnippet[];
+}
