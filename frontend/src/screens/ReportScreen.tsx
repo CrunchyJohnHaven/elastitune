@@ -1,13 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Printer, Copy, ArrowLeft, Download, RefreshCw, RotateCcw } from 'lucide-react';
+import { Printer, Copy, ArrowLeft, Loader2, Download, RefreshCw, RotateCcw } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { useToast } from '@/components/ui/ToastProvider';
 import { api } from '@/lib/api';
 import type { ReportPayload } from '@/types/contracts';
 import ExecutiveSummary from '@/components/report/ExecutiveSummary';
-import ReportInsights from '@/components/report/ReportInsights';
-import ImplementationGuide from '@/components/report/ImplementationGuide';
 import ImprovementGraph from '@/components/report/ImprovementGraph';
 import MitreCoverageHeatmap from '@/components/report/MitreCoverageHeatmap';
 import SearchProfileDiff from '@/components/report/SearchProfileDiff';
@@ -15,7 +13,8 @@ import QueryBreakdown from '@/components/report/QueryBreakdown';
 import PersonaImpactTable from '@/components/report/PersonaImpactTable';
 import CompressionSummaryComp from '@/components/report/CompressionSummary';
 import ExperimentTable from '@/components/report/ExperimentTable';
-import SkeletonCard from '@/components/ui/SkeletonCard';
+import ReportInsights from '@/components/report/ReportInsights';
+import ImplementationGuide from '@/components/report/ImplementationGuide';
 import { PANEL_BORDER, ACCENT_BLUE } from '@/lib/theme';
 import { buildShareableReportHtml } from '@/lib/reportExport';
 import WalkthroughOverlay from '@/components/walkthrough/WalkthroughOverlay';
@@ -289,16 +288,21 @@ export default function ReportScreen() {
           background: '#05070B',
           flexDirection: 'column',
           gap: 14,
-          padding: 24,
         }}
       >
-        <div style={{ width: 'min(680px, 100%)', display: 'grid', gap: 14 }}>
-          <SkeletonCard lines={2} height={98} titleWidth={260} />
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 14 }}>
-            <SkeletonCard lines={4} height={220} />
-            <SkeletonCard lines={4} height={220} />
-          </div>
-        </div>
+        <Loader2
+          size={28}
+          style={{ color: ACCENT_BLUE, animation: 'spin 1s linear infinite' }}
+        />
+        <span
+          style={{
+            fontFamily: 'Inter, sans-serif',
+            fontSize: 13,
+            color: '#6B7480',
+          }}
+        >
+          Loading report…
+        </span>
         <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
       </div>
     );
@@ -632,15 +636,6 @@ export default function ReportScreen() {
         >
           {/* Executive Summary */}
           <ExecutiveSummary report={report} />
-          <ReportInsights
-            narrative={report.narrative}
-            personaSummary={report.personaSummary}
-            changeNarratives={report.changeNarratives}
-            validationNotes={report.validationNotes}
-            confidence={report.summary.confidenceScore}
-            personaCount={report.summary.personaCount}
-          />
-          <ImplementationGuide guide={report.implementationGuide} />
           <ImprovementGraph report={report} />
           <MitreCoverageHeatmap report={report} />
 
@@ -850,6 +845,23 @@ export default function ReportScreen() {
 
           {/* Compression Summary */}
           <CompressionSummaryComp compression={report.compression} />
+
+          {/* Report Insights (narrative, persona summary, change narratives) */}
+          {(report.narrative?.length || report.changeNarratives?.length || report.personaSummary) && (
+            <ReportInsights
+              narrative={report.narrative}
+              changeNarratives={report.changeNarratives}
+              personaSummary={report.personaSummary}
+              validationNotes={report.validationNotes}
+              confidence={report.confidence}
+              personaCount={report.personaImpact?.length}
+            />
+          )}
+
+          {/* Implementation Guide */}
+          {report.implementationGuide && (
+            <ImplementationGuide guide={report.implementationGuide} />
+          )}
 
           {/* All Experiments */}
           <ExperimentTable
