@@ -200,7 +200,7 @@ export default function ImplementationGuide({ guide }: ImplementationGuideProps)
             gap: 8,
           }}
         >
-          {guide.applyInstructions.map((instruction, index) => (
+          {guide.applyInstructions.map((instruction: string, index: number) => (
             <div
               key={`${index}-${instruction}`}
               style={{
