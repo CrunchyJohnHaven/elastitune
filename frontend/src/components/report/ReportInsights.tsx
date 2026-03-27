@@ -53,7 +53,7 @@ export default function ReportInsights({
   const leadSection = sections[0];
   const supportingSections = sections.slice(1);
   const effectivePersonaCount = personaSummary?.personaCount ?? personaCount ?? 0;
-  const archetypeEntries = Object.entries(personaSummary?.archetypeCounts ?? {});
+  const archetypeEntries = Object.entries(personaSummary?.archetypeCounts ?? ({} as Record<string, number>));
   const renderedChangeNarratives = changeNarratives ?? [];
 
   const hasMetadata = confidence != null || personaCount != null;
