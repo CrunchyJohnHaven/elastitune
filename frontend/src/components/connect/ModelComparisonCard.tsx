@@ -1,5 +1,5 @@
 import React from 'react';
-import type { ModelComparisonResult } from '@/types/contracts';
+import type { ModelComparisonEntry, ModelComparisonResult } from '@/types/contracts';
 
 interface ModelComparisonCardProps {
   result: ModelComparisonResult;
@@ -27,7 +27,7 @@ export default function ModelComparisonCard({ result }: ModelComparisonCardProps
     );
   }
 
-  const maxBestScore = Math.max(...entries.map(e => e.bestScore), 0.001);
+  const maxBestScore = Math.max(...entries.map((e: ModelComparisonEntry) => e.bestScore), 0.001);
 
   return (
     <div
@@ -81,7 +81,7 @@ export default function ModelComparisonCard({ result }: ModelComparisonCardProps
 
       {/* Entry rows */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-        {entries.map((entry, idx) => {
+        {entries.map((entry: ModelComparisonEntry, idx: number) => {
           const isRecommended = entry.modelId === recommendedModel;
           const barPct = Math.min(100, (entry.bestScore / maxBestScore) * 100);
 
@@ -251,7 +251,7 @@ export default function ModelComparisonCard({ result }: ModelComparisonCardProps
                     marginTop: 4,
                   }}
                 >
-                  {entry.topChanges.slice(0, 3).map((change, ci) => (
+                  {entry.topChanges.slice(0, 3).map((change: string, ci: number) => (
                     <span
                       key={ci}
                       style={{
