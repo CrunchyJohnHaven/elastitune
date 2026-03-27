@@ -302,6 +302,12 @@ export interface ReportPayload {
   compression: CompressionSummary;
   warnings: string[];
   previousRunId?: string | null;
+  narrative?: ReportNarrativeSection[] | null;
+  changeNarratives?: ReportChangeNarrative[] | null;
+  personaSummary?: ReportPersonaSummary | null;
+  implementationGuide?: ReportImplementationGuide | null;
+  validationNotes?: ReportValidationNote[];
+  confidence?: number | null;
 }
 
 export interface SearchRunListItem {
